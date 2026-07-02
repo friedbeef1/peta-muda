@@ -7,7 +7,7 @@ import path from 'node:path'
 import { fetchJson } from './lib/fetch.mjs'
 import { SOURCES, DATASET_IDS, ELECTION_2026, STATE } from './config.mjs'
 import { loadSeats } from './steps/seats.mjs'
-import { loadHistory } from './steps/history.mjs'
+import { loadHistory, loadCareers } from './steps/history.mjs'
 import { loadSaluran } from './steps/saluran.mjs'
 import { loadDemographics } from './steps/demographics.mjs'
 import { loadKawasanku } from './steps/kawasanku.mjs'
@@ -38,6 +38,15 @@ log(`seats: ${seats.length} (featured: ${seats.filter(s => s.featured).map(s => 
 
 log('loading election history (lake headline files)')
 const history = await loadHistory(seats)
+// career records for everyone on a 2026 ballot
+const pendingUids = new Set()
+for (const seat of seats) {
+  for (const c of history.get(seat.code) ?? []) {
+    if (c.status === 'upcoming') for (const b of c.ballot) if (b.uid) pendingUids.add(b.uid)
+  }
+}
+log(`loading career records for ${pendingUids.size} 2026 candidates`)
+const careers = pendingUids.size ? await loadCareers(pendingUids) : new Map()
 log('loading saluran-level SE-15 results')
 const saluran = await loadSaluran(seats)
 log('loading voter demographics (incl. SE-16 roll)')
@@ -71,24 +80,43 @@ const priceBlockFor = (seat) => {
     const s = prices.series[b.code]
     const dSeries = district ? (s.districts[district] ?? {}) : {}
     const weeks = prices.weeks
-    const at = (series, idx) => { // idx weeks back from the latest week that has a value
-      for (let i = weeks.length - 1 - idx; i >= 0; i--) if (series[weeks[i]] != null) return series[weeks[i]]
+    // anchor on the series' own latest valued week (a sparse district can lag
+    // the shared axis); a change is only reported against a strictly earlier
+    // observation at least `back` weeks before it, else null
+    const idxOfLast = (series) => {
+      for (let i = weeks.length - 1; i >= 0; i--) if (series[weeks[i]] != null) return i
+      return -1
+    }
+    const refBefore = (series, from, back) => {
+      for (let i = from - back; i >= 0; i--) if (series[weeks[i]] != null) return series[weeks[i]]
       return null
     }
-    const latest = at(dSeries, 0)
-    const w4 = at(dSeries, 4)
-    const w12 = at(dSeries, 12)
+    const lastD = idxOfLast(dSeries)
+    const latest = lastD >= 0 ? dSeries[weeks[lastD]] : null
+    const w4 = lastD >= 0 ? refBefore(dSeries, lastD, 4) : null
+    const w12 = lastD >= 0 ? refBefore(dSeries, lastD, 12) : null
+    const lastJ = idxOfLast(s.johor)
+    const latestJohor = lastJ >= 0 ? s.johor[weeks[lastJ]] : null
+    const lastN = idxOfLast(s.national)
+    // change since the previous Johor election (2022-03), district scope when
+    // both ends exist there, else Johor scope
+    const aD = district ? prices.anchor.districts[district]?.[b.code] ?? null : null
+    const aJ = prices.anchor.johor[b.code] ?? null
+    let since_se15 = null
+    if (latest != null && aD) since_se15 = { perc: +(100 * (latest - aD) / aD).toFixed(1), then: aD, scope: 'district' }
+    else if (latestJohor != null && aJ) since_se15 = { perc: +(100 * (latestJohor - aJ) / aJ).toFixed(1), then: aJ, scope: 'johor' }
     return {
       code: b.code, key: b.key, label_bm: b.label_bm, label_en: b.label_en, item: b.item, unit: b.unit,
       latest_district: latest,
-      latest_johor: at(s.johor, 0),
-      latest_national: at(s.national, 0),
+      latest_johor: latestJohor,
+      latest_national: lastN >= 0 ? s.national[weeks[lastN]] : null,
       change_4w_perc: latest != null && w4 ? +(100 * (latest - w4) / w4).toFixed(1) : null,
       change_12w_perc: latest != null && w12 ? +(100 * (latest - w12) / w12).toFixed(1) : null,
+      since_se15,
       series: { district: dSeries, johor: s.johor, national: s.national },
     }
   })
-  return { district, weeks: prices.weeks, max_date: prices.max_date, items, premises: district ? (prices.latest[district] ?? []).slice(0, 25) : [] }
+  return { district, weeks: prices.weeks, max_date: prices.max_date, anchor_month: prices.anchor.month, items, premises: district ? (prices.latest[district] ?? []).slice(0, 25) : [] }
 }
 
 const summaries = []
@@ -107,6 +135,7 @@ for (const seat of seats) {
   const blocCandidate = upcoming?.ballot.find(b => b.party === 'MUDA' || b.party === 'PSM') ?? null
   // a seat is featured if configured as a target OR a bloc candidate is on the ballot
   const featured = seat.featured || !!blocCandidate
+  const ballot2026 = upcoming ? upcoming.ballot.map(b => ({ ...b, career: careers.get(b.uid) ?? null })) : null
 
   const seatJson = {
     ...seat,
@@ -117,7 +146,7 @@ for (const seat of seats) {
       ...(manual.election ?? {}),
       ...(manualSeat ?? {}),
       is_target: featured,
-      ballot: upcoming?.ballot ?? null,
+      ballot: ballot2026,
       voters_total: upcoming?.voters_total ?? current?.voters_total ?? null,
       muda_candidate: blocCandidate?.name ?? manualSeat?.muda_candidate ?? null,
       bloc_party: blocCandidate?.party ?? null,
@@ -163,6 +192,19 @@ const basketChanges = prices.basket.map(b => {
   return { key: b.key, label_bm: b.label_bm, label_en: b.label_en, latest, oldest, weeks: weeks.length, change_perc: +(100 * (latest - oldest) / oldest).toFixed(1) }
 }).filter(Boolean)
 
+// Johor-scope change since the previous election, for the home page + race card
+const sinceSe15Items = prices.basket.map(b => {
+  const aJ = prices.anchor.johor[b.code]
+  const s = prices.series[b.code].johor
+  const wk = prices.weeks.filter(w => s[w] != null)
+  if (!aJ || !wk.length) return null
+  const latest = s[wk[wk.length - 1]]
+  return { key: b.key, label_bm: b.label_bm, label_en: b.label_en, then: aJ, now: latest, perc: +(100 * (latest - aJ) / aJ).toFixed(1) }
+}).filter(Boolean)
+const sinceMedian = sinceSe15Items.length >= 3
+  ? [...sinceSe15Items.map(i => i.perc)].sort((a, b) => a - b)[sinceSe15Items.length >> 1]
+  : null
+
 const index = {
   built_at: new Date().toISOString(),
   state: STATE,
@@ -170,6 +212,7 @@ const index = {
   seats: summaries,
   basket: prices.basket,
   basket_changes: basketChanges,
+  basket_since_se15: sinceSe15Items.length ? { anchor_month: prices.anchor.month, median_perc: sinceMedian, items: sinceSe15Items } : null,
   price_max_date: prices.max_date,
   price_months: prices.months_used,
   fuel,

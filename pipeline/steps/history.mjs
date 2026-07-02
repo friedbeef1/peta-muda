@@ -27,6 +27,7 @@ export async function loadHistory(seats) {
     const k = statKey(r)
     if (!contests.has(k)) contests.set(k, { date: r.date, election: r.election, seat: r.seat, ballot: [] })
     contests.get(k).ballot.push({
+      uid: r.candidate_uid,
       name: r.name,
       party: r.party,
       party_uid: r.party_uid,
@@ -67,6 +68,37 @@ export async function loadHistory(seats) {
       seat: undefined,
     }))
     out.set(seat.code, list)
+  }
+  return out
+}
+
+// Career records for a set of candidate uids, from the same headline file
+// (every contest nationwide, parlimen + DUN, 1955-present).
+export async function loadCareers(uids) {
+  const rows = parseCsvObjects(await fetchText(SOURCES.headlineBallots))
+  const byUid = new Map()
+  for (const r of rows) {
+    if (!uids.has(r.candidate_uid) || r.result === 'pending') continue
+    if (!byUid.has(r.candidate_uid)) byUid.set(r.candidate_uid, [])
+    byUid.get(r.candidate_uid).push({
+      date: r.date,
+      election: r.election,
+      seat: r.seat,
+      state: r.state,
+      party: r.party,
+      votes_perc: num(r.votes_perc),
+      result: r.result,
+    })
+  }
+  const out = new Map()
+  for (const [uid, contests] of byUid) {
+    contests.sort((a, b) => b.date.localeCompare(a.date))
+    out.set(uid, {
+      contested: contests.length,
+      won: contests.filter(c => c.result.startsWith('won')).length,
+      last: contests[0],
+      contests: contests.slice(0, 8),
+    })
   }
   return out
 }

@@ -1,11 +1,14 @@
 // Fetch helpers with retry, polite pacing and an on-disk cache (.cache/)
 // so development re-runs don't hammer the public endpoints.
 import { createHash } from 'node:crypto'
-import { mkdir, readFile, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, writeFile, stat } from 'node:fs/promises'
 import path from 'node:path'
 
 const CACHE_DIR = '.cache'
 const USE_CACHE = process.env.PIPELINE_NO_CACHE !== '1'
+// Every source is mutable (nomination ballots appear overnight; the current
+// PriceCatcher month grows daily), so cached copies expire after a few hours.
+const CACHE_TTL_MS = (Number(process.env.PIPELINE_CACHE_TTL_HOURS) || 6) * 3600e3
 const UA = 'PetaMuda/0.1 (civic data app; contact: dev)'
 
 const sleep = (ms) => new Promise(r => setTimeout(r, ms))
@@ -20,8 +23,12 @@ export async function fetchRaw(url, { retries = 3, as = 'text' } = {}) {
   const file = await cachePath(url)
   if (USE_CACHE) {
     try {
-      const buf = await readFile(file)
-      return as === 'text' ? buf.toString('utf8') : buf
+      const st = await stat(file)
+      if (Date.now() - st.mtimeMs < CACHE_TTL_MS) {
+        const buf = await readFile(file)
+        return as === 'text' ? buf.toString('utf8') : buf
+      }
+      console.log(`cache expired (> ${CACHE_TTL_MS / 3600e3}h), refetching ${url.slice(0, 90)}`)
     } catch { /* miss */ }
   }
   let lastErr

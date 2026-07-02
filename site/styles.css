@@ -111,9 +111,12 @@ a { color: inherit; }
 }
 .badge.MUDA { background: var(--muda); }
 .badge.PSM { background: var(--psm); }
+/* app.js colors by coalition-at-the-contest when known (PH/BN/PN classes);
+   party classes below apply only when a party stood outside those blocs.
+   BERSATU/GERAKAN are deliberately unmapped: their bloc varies by era. */
 .badge.PH, .badge.AMANAH, .badge.DAP, .badge.PKR { background: var(--ph); }
 .badge.BN, .badge.UMNO, .badge.MCA, .badge.MIC { background: var(--bn); }
-.badge.PN, .badge.BERSATU, .badge.PAS, .badge.GERAKAN { background: var(--pn); }
+.badge.PN, .badge.PAS { background: var(--pn); }
 
 /* seat page */
 .seat-head { display: flex; gap: 14px; align-items: center; margin-bottom: 12px; }

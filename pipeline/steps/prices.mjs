@@ -7,7 +7,7 @@
 import { fetchText } from '../lib/fetch.mjs'
 import { parseCsvObjects } from '../lib/csv.mjs'
 import { scanParquetUrl, asIsoDate } from '../lib/parquet.mjs'
-import { SOURCES, STATE, BASKET, PRICE_MONTHS, PRICE_WEEKS } from '../config.mjs'
+import { SOURCES, STATE, BASKET, PRICE_MONTHS, PRICE_WEEKS, PRICE_ANCHOR_MONTH } from '../config.mjs'
 
 // KPDN uses both 'Ledang' and 'Tangkak' for the same Johor district.
 export const mergeDistrict = (d) => (d === 'Ledang' ? 'Tangkak' : d)
@@ -197,5 +197,37 @@ export async function loadPrices() {
       .sort((a, b) => Object.keys(b.prices).length - Object.keys(a.prices).length)
   }
 
-  return { basket, weeks, series, latest, max_date: maxDate, months_used: available }
+  // ---- Anchor month (previous Johor election): long-run price comparison ----
+  // Monthly medians (more robust than a single week). Items whose KPDN codes
+  // were introduced after 2022 (e.g. the Sep 2023 item-list revision) simply
+  // have no anchor and are skipped downstream.
+  const anchorJohor = new Map() // item -> prices[]
+  const anchorDistrict = new Map() // `${district}|${item}` -> prices[]
+  try {
+    await scanParquetUrl(SOURCES.pricecatcherMonth(PRICE_ANCHOR_MONTH), (r) => {
+      const item = Number(r.item_code)
+      if (!basketCodes.has(item)) return
+      const price = Number(r.price)
+      if (!Number.isFinite(price) || price <= 0) return
+      const p = premises.get(Number(r.premise_code))
+      if (!p || p.state !== STATE) return
+      if (!anchorJohor.has(item)) anchorJohor.set(item, [])
+      anchorJohor.get(item).push(price)
+      const dk = `${p.district}|${item}`
+      if (!anchorDistrict.has(dk)) anchorDistrict.set(dk, [])
+      anchorDistrict.get(dk).push(price)
+    })
+  } catch (e) {
+    console.warn(`anchor month ${PRICE_ANCHOR_MONTH} unavailable (${e.message.slice(0, 80)})`)
+  }
+  const anchor = { month: PRICE_ANCHOR_MONTH, johor: {}, districts: {} }
+  for (const [item, arr] of anchorJohor) if (arr.length >= 15) anchor.johor[item] = +median(arr).toFixed(2)
+  for (const [key, arr] of anchorDistrict) {
+    if (arr.length < 8) continue
+    const [district, item] = key.split('|')
+    if (!anchor.districts[district]) anchor.districts[district] = {}
+    anchor.districts[district][item] = +median(arr).toFixed(2)
+  }
+
+  return { basket, weeks, series, latest, anchor, max_date: maxDate, months_used: available }
 }

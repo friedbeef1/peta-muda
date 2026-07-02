@@ -75,6 +75,9 @@ export const BASKET = [
 
 // How many months of PriceCatcher to load (current month first).
 export const PRICE_MONTHS = 4
+// Long-run price anchor: the month of the previous Johor election (SE-15),
+// so every item can show "change since the last time Johor voted".
+export const PRICE_ANCHOR_MONTH = '2022-03'
 // Weekly series horizon shown in the app: 13 weekly medians = 12 intervals
 // (~3 months) so nothing displayed is older than the quarter.
 export const PRICE_WEEKS = 13

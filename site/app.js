@@ -1,8 +1,14 @@
 // Peta MUDA — Seat Command Center (static, no build step).
 // Data: electiondata.my (CC0) + data.gov.my/OpenDOSM (CC BY 4.0) + KPDN PriceCatcher.
 
+// localStorage may be blocked (SecurityError) or hold a foreign value written
+// by another app on a shared origin (e.g. github.io) — only accept 'en'/'bm'.
+const storage = {
+  get(k) { try { return localStorage.getItem(k) } catch { return null } },
+  set(k, v) { try { localStorage.setItem(k, v) } catch { /* blocked */ } },
+}
 const state = {
-  lang: localStorage.getItem('lang') || 'bm',
+  lang: storage.get('lang') === 'en' ? 'en' : 'bm',
   index: null,
   seats: new Map(), // slug -> seat json
   geo: null,
@@ -36,6 +42,16 @@ const STR = {
     contest_sub: 'Senarai calon rasmi (hari penamaan 27 Jun) — data ElectionData.MY',
     results_2026: 'Keputusan 11 Julai 2026',
     results_sub: 'Keputusan rasmi — data ElectionData.MY',
+    first_time: 'Calon kali pertama',
+    career_line: (c, w, el, yr) => `Rekod: ${c} tandingan, ${w} menang · terakhir ${el} (${yr})`,
+    race_title: 'Harga vs pendapatan vs inflasi rasmi',
+    race_sub: 'Kadar perubahan setahun — harga dapur diukur sejak PRN lalu (Mac 2022)',
+    basket_rate: 'Bakul dapur',
+    income_rate: 'Pendapatan penengah',
+    cpi_official: 'Inflasi rasmi (CPI Johor)',
+    since_se15: 'Sejak PRN Mac 2022',
+    stress_line: (r) => `Perbelanjaan isi rumah menyerap RM${r} daripada setiap RM100 pendapatan`,
+    race_note: 'Kadar harga dikira daripada median bakul KPDN; pendapatan daripada HIES (anggaran DOSM); barangan yang kod KPDN-nya berubah selepas 2022 dikecualikan.',
     bloc_candidate: 'Calon Blok Progresif',
     prices_here: 'Harga barang dapur di kawasan anda',
     prices_sub: (d) => `Harga median di premis KPDN daerah ${d} — vs median negeri Johor`,
@@ -115,6 +131,16 @@ const STR = {
     contest_sub: 'Official candidate list (nomination 27 Jun) — ElectionData.MY',
     results_2026: 'The 11 July 2026 result',
     results_sub: 'Official result — ElectionData.MY',
+    first_time: 'First-time candidate',
+    career_line: (c, w, el, yr) => `Record: ${c} contests, ${w} won · last ${el} (${yr})`,
+    race_title: 'Prices vs income vs official inflation',
+    race_sub: 'Annual rates of change — kitchen prices measured since the last election (Mar 2022)',
+    basket_rate: 'Kitchen basket',
+    income_rate: 'Median income',
+    cpi_official: 'Official inflation (Johor CPI)',
+    since_se15: 'Since the Mar 2022 election',
+    stress_line: (r) => `Household spending absorbs RM${r} of every RM100 earned`,
+    race_note: 'Price rate computed from KPDN basket medians; income from HIES (DOSM estimates); items whose KPDN codes changed after 2022 are excluded.',
     bloc_candidate: 'Progressive Bloc candidate',
     prices_here: 'Grocery prices in your area',
     prices_sub: (d) => `Median prices at KPDN premises in ${d} district — vs Johor state median`,
@@ -170,7 +196,8 @@ const STR = {
   },
 }
 const L = (k, ...args) => {
-  const v = STR[state.lang][k] ?? STR.bm[k] ?? k
+  const dict = STR[state.lang] ?? STR.bm
+  const v = dict[k] ?? STR.bm[k] ?? k
   return typeof v === 'function' ? v(...args) : v
 }
 
@@ -186,7 +213,13 @@ const deltaHtml = (v) => {
   const arrow = v > 0 ? '▲' : '▼'
   return `<span class="${cls}">${arrow}${Math.abs(v).toFixed(1)}%</span>`
 }
-const partyBadge = (p) => `<span class="badge ${esc(p)}">${esc(p)}</span>`
+// Badge colored by the coalition AT THAT CONTEST when known (BERSATU won 2018
+// as PH, GERAKAN's old wins were BN, MIPP/PEJUANG ride with PN in 2026);
+// falls back to the party's own class when standing alone.
+const partyBadge = (p, coalition) => {
+  const cls = ['PH', 'BN', 'PN'].includes(coalition) ? coalition : esc(p)
+  return `<span class="badge ${cls}">${esc(p)}</span>`
+}
 // Kawasanku amenity indicators are rates per 1,000 residents.
 const perK = (v) => `${Number(v).toFixed(2)}/1k`
 
@@ -335,6 +368,10 @@ async function renderHome() {
       <div class="chips">
         ${chips.map(c => `<span class="chip">${esc(state.lang === 'bm' ? c.label_bm : c.label_en)} ${deltaHtml(c.change_perc)}</span>`).join('')}
       </div>
+      ${idx.basket_since_se15 ? `<h3>${L('since_se15')}</h3><div class="chips">
+        ${[...idx.basket_since_se15.items].sort((a, b) => b.perc - a.perc).slice(0, 6).map(i =>
+          `<span class="chip">${esc(state.lang === 'bm' ? i.label_bm : i.label_en)} ${deltaHtml(i.perc)}</span>`).join('')}
+      </div>` : ''}
       ${fuel ? `<h3>${L('fuel')}</h3><div class="chips">
         ${fuel.ron95_budi95 != null ? `<span class="chip">RON95 BUDI95 ${fmtRM(fuel.ron95_budi95)}</span>` : ''}
         <span class="chip">RON95 ${state.lang === 'bm' ? 'tanpa subsidi' : 'unsubsidised'} ${fmtRM(fuel.ron95)}</span>
@@ -383,10 +420,14 @@ function contestCard(seat) {
       ${ballot.map(b => {
         const isBloc = b.party === 'MUDA' || b.party === 'PSM'
         const won = b.result === 'won' || b.result === 'won_uncontested'
+        const career = !resultsIn ? (b.career
+          ? L('career_line', b.career.contested, b.career.won, `${b.career.last.election} ${b.career.last.seat}`, b.career.last.date.slice(0, 4))
+          : L('first_time')) : null
         return `<tr${isBloc || won ? ' style="font-weight:800"' : ''}>
-          <td>${won ? '✓ ' : ''}${esc(b.name)}${isBloc ? ` <span title="${L('bloc_candidate')}">★</span>` : ''}</td>
+          <td>${won ? '✓ ' : ''}${esc(b.name)}${isBloc ? ` <span title="${L('bloc_candidate')}">★</span>` : ''}
+            ${career ? `<br><span style="color:var(--muted);font-size:.72rem;font-weight:400">${esc(career)}</span>` : ''}</td>
           ${resultsIn ? `<td class="num">${fmtNum(b.votes)}${b.votes_perc != null ? ` <span style="color:var(--muted)">(${fmtPct(b.votes_perc)})</span>` : ''}</td>` : ''}
-          <td class="num">${partyBadge(b.party)}</td></tr>`
+          <td class="num">${partyBadge(b.party, b.coalition)}</td></tr>`
       }).join('')}
     </tbody></table>
     ${e.notes_bm && !resultsIn ? `<div class="notice">${esc(state.lang === 'bm' ? e.notes_bm : (e.notes_en ?? e.notes_bm))}</div>` : ''}
@@ -443,6 +484,50 @@ function incomeCard(seat, bench) {
   </div>`
 }
 
+// Annualized rates: basket since the Mar 2022 election vs HIES income growth
+// vs official CPI — the cross-source comparison no single dataset can make.
+function raceStats(seat, idx) {
+  const p = seat.prices
+  const items = p.items.filter(i => i.since_se15?.perc != null)
+  if (items.length < 3 || !p.anchor_month) return null
+  const percs = items.map(i => i.since_se15.perc).sort((a, b) => a - b)
+  const medPerc = percs[percs.length >> 1]
+  const years = (new Date(`${p.max_date}T00:00:00`) - new Date(`${p.anchor_month}-15T00:00:00`)) / (365.25 * 86400e3)
+  const basketAnnual = years > 0 ? ((1 + medPerc / 100) ** (1 / years) - 1) * 100 : null
+  const inc = seat.socio.income ?? []
+  let incomeAnnual = null
+  if (inc.length >= 2) {
+    const a = inc[0], b = inc.at(-1)
+    const yrs = Number(b.date.slice(0, 4)) - Number(a.date.slice(0, 4))
+    if (yrs > 0 && a.income_median > 0) incomeAnnual = ((b.income_median / a.income_median) ** (1 / yrs) - 1) * 100
+  }
+  const cpiYoy = (idx?.cpi ?? []).at(-1)?.inflation_yoy ?? null
+  const top = [...items].sort((a, b) => b.since_se15.perc - a.since_se15.perc).slice(0, 3)
+  const exp = seat.socio.expenditure?.at(-1)
+  const expVal = exp?.expenditure_mean ?? exp?.expenditure ?? null
+  const incMean = inc.at(-1)?.income_mean ?? null
+  const stress = expVal && incMean ? Math.round(100 * expVal / incMean) : null
+  return { items, medPerc, years, basketAnnual, incomeAnnual, cpiYoy, top, stress }
+}
+
+function raceCard(seat, idx) {
+  const r = raceStats(seat, idx)
+  if (!r || r.basketAnnual == null) return ''
+  const bm = state.lang === 'bm'
+  const maxRate = Math.max(r.basketAnnual, r.incomeAnnual ?? 0, r.cpiYoy ?? 0, 0.1)
+  const topText = r.top.map(i => `${esc((bm ? i.label_bm : i.label_en).toLowerCase())} ${i.since_se15.perc > 0 ? '+' : ''}${i.since_se15.perc}%`).join(' · ')
+  return `<div class="card">
+    <h2>${L('race_title')}</h2>
+    <p class="sub">${L('race_sub')}</p>
+    ${barRow(L('basket_rate'), 100 * r.basketAnnual / maxRate, `+${r.basketAnnual.toFixed(1)}%/${bm ? 'thn' : 'yr'}`, 'var(--up)')}
+    ${r.incomeAnnual != null ? barRow(L('income_rate'), 100 * r.incomeAnnual / maxRate, `+${r.incomeAnnual.toFixed(1)}%/${bm ? 'thn' : 'yr'}`, 'var(--ink)') : ''}
+    ${r.cpiYoy != null ? barRow(L('cpi_official'), 100 * r.cpiYoy / maxRate, `+${r.cpiYoy.toFixed(1)}%/${bm ? 'thn' : 'yr'}`, 'var(--lain)') : ''}
+    <p class="sub" style="margin-top:10px">${L('since_se15')}: ${topText}</p>
+    ${r.stress != null ? `<p class="sub">${L('stress_line', r.stress)}</p>` : ''}
+    <div class="notice">${L('race_note')}</div>
+  </div>`
+}
+
 function shareText(seat) {
   const e = seat.election2026
   const inc = seat.socio.income?.at(-1)
@@ -457,20 +542,36 @@ function shareText(seat) {
   return lines.join('\n')
 }
 
-function renderBrief(seat, bench) {
+function renderBrief(seat, bench, idx) {
   return `
     ${contestCard(seat)}
     ${pricesCard(seat)}
+    ${raceCard(seat, idx)}
     ${incomeCard(seat, bench)}
     <div class="btn-row">
       <button class="btn" id="shareBtn">${L('share')}</button>
     </div>`
 }
 
-function talkingPoints(seat, bench) {
+function talkingPoints(seat, bench, idx) {
   const pts = []
   const p = seat.prices
   const bm = state.lang === 'bm'
+  // cross-source headliners: pasar vs official CPI, prices vs wages
+  const r = raceStats(seat, idx)
+  if (r?.basketAnnual != null && r.cpiYoy != null && r.basketAnnual > r.cpiYoy + 1) {
+    pts.push(bm
+      ? `Inflasi rasmi Johor hanya <strong>${r.cpiYoy.toFixed(1)}%</strong> setahun — tetapi bakul dapur di sini naik <strong>${r.basketAnnual.toFixed(1)}%</strong> setahun sejak PRN Mac 2022.`
+      : `Official Johor inflation is just <strong>${r.cpiYoy.toFixed(1)}%</strong> a year — but the kitchen basket here is up <strong>${r.basketAnnual.toFixed(1)}%</strong> a year since the Mar 2022 election.`)
+  }
+  if (r?.basketAnnual != null && r.incomeAnnual != null && r.basketAnnual > r.incomeAnnual) {
+    pts.push(bm
+      ? `Harga dapur naik <strong>${r.basketAnnual.toFixed(1)}%/thn</strong> tetapi pendapatan penengah hanya <strong>${r.incomeAnnual.toFixed(1)}%/thn</strong> — gaji kalah dalam perlumbaan harga.`
+      : `Kitchen prices are rising <strong>${r.basketAnnual.toFixed(1)}%/yr</strong> but median income only <strong>${r.incomeAnnual.toFixed(1)}%/yr</strong> — wages are losing the race.`)
+  }
+  if (r?.stress != null && r.stress >= 70) {
+    pts.push(bm ? `${L('stress_line', r.stress)}.` : `${L('stress_line', r.stress)}.`)
+  }
   for (const it of p.items) {
     if (it.change_12w_perc != null && it.change_12w_perc >= 3) {
       const price = it.latest_district ?? it.latest_johor
@@ -515,9 +616,9 @@ function talkingPoints(seat, bench) {
   return pts
 }
 
-function renderField(seat, bench) {
+function renderField(seat, bench, idx) {
   const demo = seat.demographics.find(d => d.election === 'JHR-SE-16') ?? seat.demographics[0]
-  const pts = talkingPoints(seat, bench)
+  const pts = talkingPoints(seat, bench, idx)
   let demoHtml = ''
   if (demo) {
     const ageBands = [['18–20', demo.age.age_18_20], ['21–29', demo.age.age_21_29], ['30–39', demo.age.age_30_39], ['40–49', demo.age.age_40_49], ['50–59', demo.age.age_50_59], ['60–69', demo.age.age_60_69], ['70+', demo.age.age_70_79 + demo.age.age_80_89 + demo.age['age_90+']]]
@@ -569,7 +670,7 @@ function renderHq(seat) {
       <tbody>${hist.map(c => `
         <tr>
           <td>${esc(c.election)}<br><span style="color:var(--muted);font-size:.72rem">${esc(c.date)} · ${esc(c.code_then)}</span></td>
-          <td>${esc(c.ballot[0]?.name ?? '')}<br>${partyBadge(c.ballot[0]?.party ?? '?')}</td>
+          <td>${esc(c.ballot[0]?.name ?? '')}<br>${partyBadge(c.ballot[0]?.party ?? '?', c.ballot[0]?.coalition)}</td>
           <td class="num">${fmtPct(c.majority_perc)}</td>
           <td class="num">${fmtPct(c.voter_turnout_perc)}</td>
         </tr>`).join('')}
@@ -672,7 +773,7 @@ async function renderSeat(slug, tab = 'brief') {
     <div id="tabContent"></div>`
 
   const content = document.getElementById('tabContent')
-  content.innerHTML = tab === 'field' ? renderField(seat, bench) : tab === 'hq' ? renderHq(seat) : renderBrief(seat, bench)
+  content.innerHTML = tab === 'field' ? renderField(seat, bench, idx) : tab === 'hq' ? renderHq(seat) : renderBrief(seat, bench, idx)
 
   document.querySelectorAll('.tabs button').forEach(btn =>
     btn.addEventListener('click', () => { location.hash = `#/seat/${slug}/${btn.dataset.tab}` }))
@@ -736,7 +837,7 @@ async function route() {
 
 document.getElementById('langToggle').addEventListener('click', () => {
   state.lang = state.lang === 'bm' ? 'en' : 'bm'
-  localStorage.setItem('lang', state.lang)
+  storage.set('lang', state.lang)
   document.getElementById('langToggle').textContent = state.lang === 'bm' ? 'EN' : 'BM'
   route()
 })
