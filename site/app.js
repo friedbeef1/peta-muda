@@ -77,6 +77,9 @@ const STR = {
     beat_message: 'Mesej di pintu',
     beat_ground: 'Peta lapangan',
     beat_ask: 'Tindakan',
+    issues_title: 'Isu tempatan (disahkan sumber)',
+    issues_sub: 'Isu khusus kawasan ini, disemak terhadap laporan berita — nombor rujukan boleh diklik',
+    issues_statewide: 'Seluruh Johor',
     talking_points: 'Isu untuk pintu ke pintu',
     tp_sub: 'Dijana automatik daripada data rasmi — semak sebelum guna',
     demo_title: 'Profil pengundi (daftar pemilih 2026)',
@@ -173,6 +176,9 @@ const STR = {
     beat_message: 'The doorstep message',
     beat_ground: 'The ground map',
     beat_ask: 'The ask',
+    issues_title: 'Local issues (source-verified)',
+    issues_sub: 'Issues specific to this area, checked against news reporting — reference numbers are clickable',
+    issues_statewide: 'Johor-wide',
     talking_points: 'Door-knocking talking points',
     tp_sub: 'Auto-generated from official data — verify before use',
     demo_title: 'Voter profile (2026 electoral roll)',
@@ -741,6 +747,31 @@ function storyCard(seat, bench, idx) {
   </div>`
 }
 
+// Curated, source-verified local issues (data/manual/issues.json via pipeline).
+function issuesCard(seat) {
+  const li = seat.local_issues
+  if (!li) return ''
+  const bm = state.lang === 'bm'
+  const render = (list, tag) => list.map(it => {
+    const text = bm ? (it.issue_bm ?? it.issue_en) : (it.issue_en ?? it.issue_bm)
+    const receipt = bm ? (it.receipt_bm ?? it.receipt_en) : (it.receipt_en ?? it.receipt_bm)
+    const refs = (it.sources ?? []).map((u, i) =>
+      ` <a href="${esc(u)}" target="_blank" rel="noopener" style="color:var(--muted)">[${i + 1}]</a>`).join('')
+    return `<li>${tag ? `<span class="badge" style="background:var(--lain)">${esc(tag)}</span> ` : ''}${esc(text ?? '')}${receipt ? `<br><span style="color:var(--muted);font-size:.78rem">${esc(receipt)}</span>` : ''}${refs}</li>`
+  }).join('')
+  const seatItems = li.seat ?? []
+  const stateItems = li.statewide ?? []
+  if (!seatItems.length && !stateItems.length) return ''
+  return `<div class="card">
+    <h2>${L('issues_title')}</h2>
+    <p class="sub">${L('issues_sub')}</p>
+    <ul class="points">
+      ${render(seatItems, null)}
+      ${render(stateItems, L('issues_statewide'))}
+    </ul>
+  </div>`
+}
+
 function renderField(seat, bench, idx) {
   const demo = seat.demographics.find(d => d.election === 'JHR-SE-16') ?? seat.demographics[0]
   const pts = talkingPoints(seat, bench, idx)
@@ -778,6 +809,7 @@ function renderField(seat, bench, idx) {
 
   return `
     ${storyCard(seat, bench, idx)}
+    ${issuesCard(seat)}
     <div class="card">
       <h2>${L('talking_points')}</h2>
       <p class="sub">${L('tp_sub')}</p>

@@ -1,0 +1,6 @@
+{
+  "_comment": "Curated local doorstep issues, verified against sources before inclusion. Filled by research + adversarial verification; edit freely. 'seats' keys are DUN codes; 'statewide' applies to all featured seats. Each issue: issue_bm/issue_en (one doorstep sentence), receipt (the checkable fact), sources (URLs).",
+  "updated": null,
+  "seats": {},
+  "statewide": []
+}

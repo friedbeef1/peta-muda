@@ -70,6 +70,12 @@ try {
   manual = JSON.parse(await readFile(path.join('data', 'manual', 'se16.json'), 'utf8'))
 } catch { log('no manual se16.json, using config defaults') }
 
+// ---- curated local issues (research-verified, hand-maintained) ----
+let issuesManual = { seats: {}, statewide: [] }
+try {
+  issuesManual = JSON.parse(await readFile(path.join('data', 'manual', 'issues.json'), 'utf8'))
+} catch { log('no manual issues.json, skipping local issues') }
+
 // ---- assemble ----
 await mkdir(path.join(OUT, 'seats'), { recursive: true })
 
@@ -157,6 +163,11 @@ for (const seat of seats) {
     socio: socio.get(seat.code) ?? {},
     kawasanku: kawasanku.get(seat.code) ?? null,
     prices: priceBlock,
+    local_issues: {
+      seat: issuesManual.seats?.[seat.code] ?? [],
+      statewide: issuesManual.statewide ?? [],
+      updated: issuesManual.updated ?? null,
+    },
   }
   await writeFile(path.join(OUT, 'seats', `${seat.slug}.json`), JSON.stringify(seatJson))
 
