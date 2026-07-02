@@ -70,6 +70,13 @@ const STR = {
     vs_johor_median: 'penengah DUN Johor',
     share: 'Kongsi ringkasan',
     copied: 'Disalin ke papan keratan!',
+    story_title: 'Cerita kempen — 5 langkah',
+    story_sub: 'Satu naratif tersusun; butiran penuh di bahagian bawah',
+    beat_path: 'Jalan kemenangan',
+    beat_voters: 'Pengundi penentu',
+    beat_message: 'Mesej di pintu',
+    beat_ground: 'Peta lapangan',
+    beat_ask: 'Tindakan',
     talking_points: 'Isu untuk pintu ke pintu',
     tp_sub: 'Dijana automatik daripada data rasmi — semak sebelum guna',
     demo_title: 'Profil pengundi (daftar pemilih 2026)',
@@ -159,6 +166,13 @@ const STR = {
     vs_johor_median: 'Johor DUN median',
     share: 'Share summary',
     copied: 'Copied to clipboard!',
+    story_title: 'The campaign story — 5 beats',
+    story_sub: 'One ordered narrative; full detail in the sections below',
+    beat_path: 'Path to victory',
+    beat_voters: 'The deciders',
+    beat_message: 'The doorstep message',
+    beat_ground: 'The ground map',
+    beat_ask: 'The ask',
     talking_points: 'Door-knocking talking points',
     tp_sub: 'Auto-generated from official data — verify before use',
     demo_title: 'Voter profile (2026 electoral roll)',
@@ -616,6 +630,117 @@ function talkingPoints(seat, bench, idx) {
   return pts
 }
 
+// The prioritized 5-beat narrative: one story a candidate can carry, ordered
+// by what wins the seat — path, people, message, ground, ask. Every number is
+// pulled from the same verified data as the sections below it.
+function storyFor(seat, bench, idx) {
+  const bm = state.lang === 'bm'
+  const beats = []
+  const hist = seat.history
+  const last = hist[0]
+  const prev = hist.slice(1).find(c => c.voter_turnout_perc != null)
+
+  // 1 — path to victory (the turnout math)
+  if (last) {
+    const w = last.ballot[0]
+    const t = last.voter_turnout_perc
+    const tp = prev?.voter_turnout_perc
+    const turnoutCollapsed = t != null && tp != null && tp - t > 10
+    beats.push({
+      title: L('beat_path'),
+      text: bm
+        ? `${esc(w?.party ?? '?')} menang pada ${last.date.slice(0, 4)} dengan majoriti <strong>${fmtPct(last.majority_perc)}</strong>${t != null ? `, tetapi hanya <strong>${fmtPct(t, 0)}</strong> keluar mengundi${turnoutCollapsed ? ` (${prev.date.slice(0, 4)}: ${fmtPct(tp, 0)})` : ''}` : ''}. ${turnoutCollapsed ? 'Kerusi ini diputuskan oleh siapa yang KELUAR, bukan siapa yang bertukar parti.' : 'Setiap undi dikira.'}`
+        : `${esc(w?.party ?? '?')} won in ${last.date.slice(0, 4)} with a <strong>${fmtPct(last.majority_perc)}</strong> majority${t != null ? `, but only <strong>${fmtPct(t, 0)}</strong> turned out${turnoutCollapsed ? ` (${prev.date.slice(0, 4)}: ${fmtPct(tp, 0)})` : ''}` : ''}. ${turnoutCollapsed ? 'This seat is decided by who SHOWS UP, not who switches sides.' : 'Every vote counts.'}`,
+    })
+  }
+
+  // 2 — the deciders (youth + new voters)
+  const demo = seat.demographics.find(d => d.election === 'JHR-SE-16')
+  const ge15 = seat.demographics.find(d => d.election === 'GE-15')
+  if (demo) {
+    const youthN = demo.age.age_18_20 + demo.age.age_21_29
+    const youthP = Math.round(100 * youthN / demo.voters_total)
+    const newV = ge15 && demo.voters_total > ge15.voters_total ? demo.voters_total - ge15.voters_total : null
+    beats.push({
+      title: L('beat_voters'),
+      text: bm
+        ? `<strong>${fmtNum(youthN)}</strong> pengundi bawah 30 (${youthP}% daftar 2026)${newV ? `, termasuk <strong>${fmtNum(newV)}</strong> pengundi baharu sejak PRU15` : ''}. Merekalah yang menentukan langkah 1.`
+        : `<strong>${fmtNum(youthN)}</strong> voters under 30 (${youthP}% of the 2026 roll)${newV ? `, including <strong>${fmtNum(newV)}</strong> new voters since GE15` : ''}. They decide beat 1.`,
+    })
+  }
+
+  // 3 — the doorstep message (one issue, not twelve)
+  const risers = seat.prices.items
+    .filter(i => i.change_12w_perc != null && i.change_12w_perc >= 3)
+    .sort((a, b) => b.change_12w_perc - a.change_12w_perc)
+  const r = raceStats(seat, idx)
+  if (risers.length) {
+    const top = risers[0]
+    const lbl = (bm ? top.label_bm : top.label_en).toLowerCase()
+    const cpi = r?.cpiYoy
+    beats.push({
+      title: L('beat_message'),
+      text: bm
+        ? `Satu isu, satu mesej: harga <strong>${esc(lbl)}</strong> naik <strong>${top.change_12w_perc}%</strong> dalam 12 minggu di ${esc(seat.prices.district ?? 'Johor')}${cpi != null ? ` — sedangkan inflasi rasmi kata ${cpi.toFixed(1)}% SETAHUN` : ''}. Tunjukkan harga di pasar mereka sendiri (senarai premis di bawah).`
+        : `One issue, one message: <strong>${esc(lbl)}</strong> up <strong>${top.change_12w_perc}%</strong> in 12 weeks in ${esc(seat.prices.district ?? 'Johor')}${cpi != null ? ` — while official inflation says ${cpi.toFixed(1)}% A YEAR` : ''}. Show them prices from their own market (premise list below).`,
+    })
+  }
+
+  // 4 — the ground map (where to spend shoe leather)
+  const sal = seat.saluran2022
+  if (sal) {
+    const dms = sal.dms.filter(d => d.type === 'biasa' && d.valid > 0)
+    const share = (dm, b) => 100 * (dm.blocs[b] || 0) / dm.valid
+    const own = (sal.totals.MUDA ? 'MUDA' : sal.totals.PH ? 'PH' : null)
+    if (seat.featured && own && dms.length) {
+      const top = [...dms].sort((a, b) => share(b, own) - share(a, own)).slice(0, 3)
+      const list = top.map(d => `${esc(d.name)} (${share(d, own).toFixed(0)}% ${own}, ${bm ? 'keluar' : 'turnout'} ${fmtPct(d.turnout_perc, 0)})`).join(' · ')
+      beats.push({
+        title: L('beat_ground'),
+        text: bm
+          ? `Kubu 2022 dengan keluar mengundi rendah = undi tersedia menunggu dikutip: ${list}.`
+          : `2022 strongholds with low turnout = votes waiting to be collected: ${list}.`,
+      })
+    } else if (dms.length) {
+      const close = dms.map(d => {
+        const s = Object.values(d.blocs).map(v => 100 * v / d.valid).sort((x, y) => y - x)
+        return { d, gap: (s[0] ?? 0) - (s[1] ?? 0) }
+      }).sort((a, b) => a.gap - b.gap)[0]
+      if (close) beats.push({
+        title: L('beat_ground'),
+        text: bm
+          ? `Medan rebutan paling sengit 2022: <strong>${esc(close.d.name)}</strong> (beza hanya ${close.gap.toFixed(0)} mata). Mulakan di situ.`
+          : `Tightest battleground in 2022: <strong>${esc(close.d.name)}</strong> (only ${close.gap.toFixed(0)} points apart). Start there.`,
+      })
+    }
+  }
+
+  // 5 — the ask
+  const e = seat.election2026
+  if (e?.polling_date) {
+    const past = new Date(`${e.polling_date}T00:00:00`) < new Date()
+    if (!past) beats.push({
+      title: L('beat_ask'),
+      text: bm
+        ? `Undi awal <strong>7 Julai</strong> · hari mengundi <strong>11 Julai</strong>. Setiap penyokong yang dikenal pasti dalam langkah 4: pastikan mereka tahu pusat mengundi dan ada pengangkutan.`
+        : `Early voting <strong>7 July</strong> · polling day <strong>11 July</strong>. For every supporter identified in beat 4: make sure they know their polling centre and have a ride.`,
+    })
+  }
+  return beats
+}
+
+function storyCard(seat, bench, idx) {
+  const beats = storyFor(seat, bench, idx)
+  if (beats.length < 3) return ''
+  return `<div class="card">
+    <h2>${L('story_title')}</h2>
+    <p class="sub">${L('story_sub')}</p>
+    <ol class="story">
+      ${beats.map(b => `<li><div><div class="beat-title">${esc(b.title)}</div><div>${b.text}</div></div></li>`).join('')}
+    </ol>
+  </div>`
+}
+
 function renderField(seat, bench, idx) {
   const demo = seat.demographics.find(d => d.election === 'JHR-SE-16') ?? seat.demographics[0]
   const pts = talkingPoints(seat, bench, idx)
@@ -652,6 +777,7 @@ function renderField(seat, bench, idx) {
   </div>` : ''
 
   return `
+    ${storyCard(seat, bench, idx)}
     <div class="card">
       <h2>${L('talking_points')}</h2>
       <p class="sub">${L('tp_sub')}</p>

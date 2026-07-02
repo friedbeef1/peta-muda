@@ -155,6 +155,19 @@ table.data td.num, table.data th.num { text-align: right; font-variant-numeric: 
 .points li { margin-bottom: 8px; }
 .points { padding-left: 20px; margin: 8px 0; }
 
+.story { list-style: none; padding: 0; margin: 10px 0 0; counter-reset: beat; }
+.story li { display: flex; gap: 12px; margin-bottom: 14px; counter-increment: beat; }
+.story li::before {
+  content: counter(beat);
+  flex: 0 0 26px; height: 26px; border-radius: 50%;
+  background: var(--ink); color: #fff; font-weight: 800; font-size: .85rem;
+  display: flex; align-items: center; justify-content: center; margin-top: 2px;
+}
+.story .beat-title {
+  font-weight: 800; font-size: .72rem; text-transform: uppercase;
+  letter-spacing: .5px; color: var(--muted); margin-bottom: 2px;
+}
+
 .btn {
   display: inline-block; border: 0; background: var(--ink); color: #fff;
   font-weight: 700; font-size: .9rem; padding: 10px 16px; border-radius: 10px;
