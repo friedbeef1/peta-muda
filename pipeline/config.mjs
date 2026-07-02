@@ -75,8 +75,9 @@ export const BASKET = [
 
 // How many months of PriceCatcher to load (current month first).
 export const PRICE_MONTHS = 4
-// Weekly series horizon shown in the app.
-export const PRICE_WEEKS = 14
+// Weekly series horizon shown in the app: 13 weekly medians = 12 intervals
+// (~3 months) so nothing displayed is older than the quarter.
+export const PRICE_WEEKS = 13
 
 export const SOURCES = {
   seatsDropdown: 'https://internal.electiondata.my/seats/current/dropdown.json',

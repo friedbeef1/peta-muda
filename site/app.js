@@ -18,7 +18,8 @@ const STR = {
     poll_today: 'HARI MENGUNDI — keluar mengundi!',
     poll_over: 'PRN Johor 2026 telah selesai. Terima kasih kerana mengundi!',
     featured: 'Kerusi Blok Progresif (MUDA–PSM)',
-    cost_headline: 'Harga dapur di Johor — 13 minggu terkini',
+    as_of: 'Harga setakat',
+    cost_headline: 'Harga dapur di Johor — 12 minggu terkini',
     cost_sub: 'Perubahan harga median barangan asas di premis Johor (data PriceCatcher KPDN, dikemas kini harian)',
     fuel: 'Harga runcit petrol minggu ini (seluruh negara)',
     all_seats: 'Semua 56 kerusi DUN Johor',
@@ -96,7 +97,8 @@ const STR = {
     poll_today: 'POLLING DAY — get out and vote!',
     poll_over: 'The 2026 Johor election has concluded. Thank you for voting!',
     featured: 'Progressive Bloc seats (MUDA–PSM)',
-    cost_headline: 'Kitchen prices in Johor — last 13 weeks',
+    as_of: 'Prices as of',
+    cost_headline: 'Kitchen prices in Johor — last 12 weeks',
     cost_sub: 'Median price change for staples at Johor premises (KPDN PriceCatcher, updated daily)',
     fuel: 'This week’s retail fuel prices (nationwide)',
     all_seats: 'All 56 Johor state seats',
@@ -187,6 +189,14 @@ const deltaHtml = (v) => {
 const partyBadge = (p) => `<span class="badge ${esc(p)}">${esc(p)}</span>`
 // Kawasanku amenity indicators are rates per 1,000 residents.
 const perK = (v) => `${Number(v).toFixed(2)}/1k`
+
+// "as of" label for price data, flagged red if the source feed has stalled
+const asOfHtml = (maxDate) => {
+  if (!maxDate) return ''
+  const days = Math.round((Date.now() - new Date(`${maxDate}T00:00:00`).getTime()) / 86400e3)
+  const stale = days > 7
+  return ` · <span${stale ? ' class="delta-up"' : ''}>${L('as_of')} ${esc(maxDate)}${stale ? ` (${days}d!)` : ''}</span>`
+}
 
 const BLOC_COLORS = { PH: 'var(--ph)', BN: 'var(--bn)', PN: 'var(--pn)', MUDA: 'var(--muda)', LAIN: 'var(--lain)' }
 
@@ -321,7 +331,7 @@ async function renderHome() {
 
     <div class="card">
       <h2>${L('cost_headline')}</h2>
-      <p class="sub">${L('cost_sub')}</p>
+      <p class="sub">${L('cost_sub')}${asOfHtml(idx.price_max_date)}</p>
       <div class="chips">
         ${chips.map(c => `<span class="chip">${esc(state.lang === 'bm' ? c.label_bm : c.label_en)} ${deltaHtml(c.change_perc)}</span>`).join('')}
       </div>
@@ -404,7 +414,7 @@ function pricesCard(seat, compact = true) {
   const anyDistrict = p.items.some(it => it.latest_district != null)
   return `<div class="card">
     <h2>${L('prices_here')}</h2>
-    <p class="sub">${L('prices_sub', esc(p.district ?? '–'))}</p>
+    <p class="sub">${L('prices_sub', esc(p.district ?? '–'))}${asOfHtml(p.max_date)}</p>
     <table class="data">
       <thead><tr><th>${L('col_item')}</th><th class="num">${L('col_price')}</th><th class="num">${L('col_johor')}</th><th>${L('trend')}</th><th class="num">${L('col_12w')}</th></tr></thead>
       <tbody>${rows}</tbody>

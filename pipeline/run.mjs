@@ -186,6 +186,12 @@ await writeFile(path.join(OUT, 'index.json'), JSON.stringify(index))
 await writeFile(path.join(OUT, 'johor_dun.geojson'), JSON.stringify(geojson))
 
 // ---- sanity checks ----
+// PriceCatcher freshness guard: the current-month file updates daily at
+// source; if the newest observation is over a week old the feed has stalled
+// (the same silent failure hit the official flood API).
+const priceAgeDays = Math.round((Date.now() - new Date(`${prices.max_date}T00:00:00Z`).getTime()) / 86400e3)
+if (priceAgeDays > 7) log(`WARNING: PriceCatcher data is ${priceAgeDays} days old (newest obs ${prices.max_date}) — feed may have stalled`)
+
 const withDemo = summaries.filter(s => s.voters_total).length
 const withResult = summaries.filter(s => s.last_result).length
 const withPrices = summaries.filter(s => s.kpdn_district).length
