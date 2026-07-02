@@ -113,6 +113,7 @@ const STR = {
     income_note: (y) => `Anggaran HIES ${y}, DOSM`,
     price_note: 'Harga ialah median premis yang dipantau KPDN; boleh berbeza di kedai berlainan.',
     no_price: 'Tiada data harga daerah — median Johor ditunjukkan.',
+    top3_note: (n) => `3 kenaikan paling ketara daripada ${n} barangan dipantau.`,
     clinics: 'Klinik', schools: 'Sekolah', hospitals: 'Hospital', grocery: 'Kedai runcit', atm: 'ATM', petrol: 'Stesen minyak', police_fire: 'Polis/Bomba', water: 'Akses air', electricity: 'Akses elektrik', expenditure: 'Perbelanjaan purata',
   },
   en: {
@@ -212,6 +213,7 @@ const STR = {
     income_note: (y) => `HIES ${y} estimate, DOSM`,
     price_note: 'Prices are medians across KPDN-monitored premises; individual shops vary.',
     no_price: 'No district price data — Johor median shown.',
+    top3_note: (n) => `Top 3 rises out of ${n} monitored items.`,
     clinics: 'Clinics', schools: 'Schools', hospitals: 'Hospitals', grocery: 'Grocery stores', atm: 'ATMs', petrol: 'Petrol stations', police_fire: 'Police/Fire', water: 'Water access', electricity: 'Electricity access', expenditure: 'Mean expenditure',
   },
 }
@@ -361,7 +363,7 @@ function countdownCard(idx) {
 async function renderHome() {
   const idx = await loadIndex()
   const featured = idx.seats.filter(s => s.featured)
-  const chips = [...idx.basket_changes].sort((a, b) => Math.abs(b.change_perc) - Math.abs(a.change_perc)).slice(0, 8)
+  const chips = [...idx.basket_changes].sort((a, b) => b.change_perc - a.change_perc).slice(0, 3)
   const fuel = idx.fuel?.at(-1)
 
   app.innerHTML = `
@@ -389,7 +391,7 @@ async function renderHome() {
         ${chips.map(c => `<span class="chip">${esc(state.lang === 'bm' ? c.label_bm : c.label_en)} ${deltaHtml(c.change_perc)}</span>`).join('')}
       </div>
       ${idx.basket_since_se15 ? `<h3>${L('since_se15')}</h3><div class="chips">
-        ${[...idx.basket_since_se15.items].sort((a, b) => b.perc - a.perc).slice(0, 6).map(i =>
+        ${[...idx.basket_since_se15.items].sort((a, b) => b.perc - a.perc).slice(0, 3).map(i =>
           `<span class="chip">${esc(state.lang === 'bm' ? i.label_bm : i.label_en)} ${deltaHtml(i.perc)}</span>`).join('')}
       </div>` : ''}
       ${fuel ? `<h3>${L('fuel')}</h3><div class="chips">
@@ -457,7 +459,13 @@ function contestCard(seat) {
 function pricesCard(seat, compact = true) {
   const p = seat.prices
   if (!p?.items?.length) return ''
-  const rows = p.items.map(it => {
+  // signal over noise: only the 3 items that rose the most
+  const top = [...p.items]
+    .filter(i => i.change_12w_perc != null)
+    .sort((a, b) => b.change_12w_perc - a.change_12w_perc)
+    .slice(0, 3)
+  if (!top.length) return ''
+  const rows = top.map(it => {
     const hasDistrict = it.latest_district != null
     const price = hasDistrict ? it.latest_district : it.latest_johor
     const spark = sparkline(p.weeks, [
@@ -472,7 +480,7 @@ function pricesCard(seat, compact = true) {
       <td class="num">${deltaHtml(it.change_12w_perc)}</td>
     </tr>`
   }).join('')
-  const anyDistrict = p.items.some(it => it.latest_district != null)
+  const anyDistrict = top.some(it => it.latest_district != null)
   return `<div class="card">
     <h2>${L('prices_here')}</h2>
     <p class="sub">${L('prices_sub', esc(p.district ?? '–'))}${asOfHtml(p.max_date)}</p>
@@ -480,7 +488,7 @@ function pricesCard(seat, compact = true) {
       <thead><tr><th>${L('col_item')}</th><th class="num">${L('col_price')}</th><th class="num">${L('col_johor')}</th><th>${L('trend')}</th><th class="num">${L('col_12w')}</th></tr></thead>
       <tbody>${rows}</tbody>
     </table>
-    <div class="notice">${anyDistrict ? L('price_note') : L('no_price')}</div>
+    <div class="notice">${L('top3_note', p.items.length)} ${anyDistrict ? L('price_note') : L('no_price')}</div>
   </div>`
 }
 
@@ -592,13 +600,15 @@ function talkingPoints(seat, bench, idx) {
   if (r?.stress != null && r.stress >= 70) {
     pts.push(bm ? `${L('stress_line', r.stress)}.` : `${L('stress_line', r.stress)}.`)
   }
-  for (const it of p.items) {
-    if (it.change_12w_perc != null && it.change_12w_perc >= 3) {
-      const price = it.latest_district ?? it.latest_johor
-      pts.push(bm
-        ? `Harga <strong>${esc(it.label_bm.toLowerCase())}</strong> naik <strong>${it.change_12w_perc}%</strong> dalam 3 bulan di daerah ${esc(p.district)} (kini ${fmtRM(price)}/${esc(it.unit)}).`
-        : `<strong>${esc(it.label_en)}</strong> price up <strong>${it.change_12w_perc}%</strong> in 3 months in ${esc(p.district)} district (now ${fmtRM(price)}/${esc(it.unit)}).`)
-    }
+  const topRisers = [...p.items]
+    .filter(i => i.change_12w_perc != null && i.change_12w_perc >= 3)
+    .sort((a, b) => b.change_12w_perc - a.change_12w_perc)
+    .slice(0, 3)
+  for (const it of topRisers) {
+    const price = it.latest_district ?? it.latest_johor
+    pts.push(bm
+      ? `Harga <strong>${esc(it.label_bm.toLowerCase())}</strong> naik <strong>${it.change_12w_perc}%</strong> dalam 3 bulan di daerah ${esc(p.district)} (kini ${fmtRM(price)}/${esc(it.unit)}).`
+      : `<strong>${esc(it.label_en)}</strong> price up <strong>${it.change_12w_perc}%</strong> in 3 months in ${esc(p.district)} district (now ${fmtRM(price)}/${esc(it.unit)}).`)
   }
   const inc = seat.socio.income?.at(-1)
   if (inc && bench.income_median && inc.income_median < bench.income_median * 0.9) {
