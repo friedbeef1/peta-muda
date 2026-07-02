@@ -33,6 +33,8 @@ const STR = {
     tab_hq: 'Analisis',
     contest_2026: 'Pertandingan 11 Julai 2026',
     contest_sub: 'Senarai calon rasmi (hari penamaan 27 Jun) — data ElectionData.MY',
+    results_2026: 'Keputusan 11 Julai 2026',
+    results_sub: 'Keputusan rasmi — data ElectionData.MY',
     bloc_candidate: 'Calon Blok Progresif',
     prices_here: 'Harga barang dapur di kawasan anda',
     prices_sub: (d) => `Harga median di premis KPDN daerah ${d} — vs median negeri Johor`,
@@ -109,6 +111,8 @@ const STR = {
     tab_hq: 'Analysis',
     contest_2026: 'The 11 July 2026 contest',
     contest_sub: 'Official candidate list (nomination 27 Jun) — ElectionData.MY',
+    results_2026: 'The 11 July 2026 result',
+    results_sub: 'Official result — ElectionData.MY',
     bloc_candidate: 'Progressive Bloc candidate',
     prices_here: 'Grocery prices in your area',
     prices_sub: (d) => `Median prices at KPDN premises in ${d} district — vs Johor state median`,
@@ -303,7 +307,7 @@ async function renderHome() {
 
     <div class="card">
       <h2>${L('featured')}</h2>
-      <p class="sub">${idx.election.name_bm ?? ''}</p>
+      <p class="sub">${esc((state.lang === 'bm' ? idx.election.name_bm : idx.election.name_en) ?? idx.election.name_bm ?? '')}</p>
       <div class="seat-grid">
         ${featured.map(s => `
           <a class="seat-card featured" href="#/seat/${s.slug}">
@@ -357,19 +361,25 @@ async function renderHome() {
 // ---- seat tabs ----
 function contestCard(seat) {
   const e = seat.election2026
-  if (!e?.ballot) return ''
+  // once results are in, the pending ballot disappears and the contest tops history
+  const done = seat.history?.[0]
+  const resultsIn = !e?.ballot && done && done.date === e?.polling_date
+  if (!e?.ballot && !resultsIn) return ''
+  const ballot = e?.ballot ?? done.ballot
   return `<div class="card">
-    <h2>${L('contest_2026')}</h2>
-    <p class="sub">${L('contest_sub')} · ${fmtNum(e.voters_total)} ${L('voters')}</p>
+    <h2>${resultsIn ? L('results_2026') : L('contest_2026')}</h2>
+    <p class="sub">${resultsIn ? L('results_sub') : L('contest_sub')} · ${fmtNum(resultsIn ? done.voters_total : e.voters_total)} ${L('voters')}</p>
     <table class="data"><tbody>
-      ${e.ballot.map(b => {
+      ${ballot.map(b => {
         const isBloc = b.party === 'MUDA' || b.party === 'PSM'
-        return `<tr${isBloc ? ' style="font-weight:800"' : ''}>
-          <td>${esc(b.name)}${isBloc ? ` <span title="${L('bloc_candidate')}">★</span>` : ''}</td>
+        const won = b.result === 'won' || b.result === 'won_uncontested'
+        return `<tr${isBloc || won ? ' style="font-weight:800"' : ''}>
+          <td>${won ? '✓ ' : ''}${esc(b.name)}${isBloc ? ` <span title="${L('bloc_candidate')}">★</span>` : ''}</td>
+          ${resultsIn ? `<td class="num">${fmtNum(b.votes)}${b.votes_perc != null ? ` <span style="color:var(--muted)">(${fmtPct(b.votes_perc)})</span>` : ''}</td>` : ''}
           <td class="num">${partyBadge(b.party)}</td></tr>`
       }).join('')}
     </tbody></table>
-    ${e.notes_bm ? `<div class="notice">${esc(state.lang === 'bm' ? e.notes_bm : (e.notes_en ?? e.notes_bm))}</div>` : ''}
+    ${e.notes_bm && !resultsIn ? `<div class="notice">${esc(state.lang === 'bm' ? e.notes_bm : (e.notes_en ?? e.notes_bm))}</div>` : ''}
   </div>`
 }
 
@@ -487,9 +497,10 @@ function talkingPoints(seat, bench) {
   }
   const last = seat.history[0]
   if (last?.majority_perc != null && last.majority_perc < 10) {
+    const yr = last.date?.slice(0, 4) ?? ''
     pts.push(bm
-      ? `Kerusi marginal: majoriti 2022 hanya <strong>${fmtPct(last.majority_perc)}</strong> (${fmtNum(last.majority)} undi).`
-      : `Marginal seat: 2022 majority was only <strong>${fmtPct(last.majority_perc)}</strong> (${fmtNum(last.majority)} votes).`)
+      ? `Kerusi marginal: majoriti ${yr} (${esc(last.election)}) hanya <strong>${fmtPct(last.majority_perc)}</strong> (${fmtNum(last.majority)} undi).`
+      : `Marginal seat: the ${yr} (${esc(last.election)}) majority was only <strong>${fmtPct(last.majority_perc)}</strong> (${fmtNum(last.majority)} votes).`)
   }
   return pts
 }
@@ -659,8 +670,24 @@ async function renderSeat(slug, tab = 'brief') {
   const shareBtn = document.getElementById('shareBtn')
   if (shareBtn) shareBtn.addEventListener('click', async () => {
     const text = shareText(seat)
-    if (navigator.share) { try { await navigator.share({ text }) } catch { /* cancelled */ } }
-    else { await navigator.clipboard.writeText(text); shareBtn.textContent = L('copied') }
+    if (navigator.share) { try { await navigator.share({ text }) } catch { /* cancelled */ } return }
+    let ok = false
+    if (navigator.clipboard?.writeText) {
+      try { await navigator.clipboard.writeText(text); ok = true } catch { /* denied */ }
+    }
+    if (!ok) {
+      // clipboard API needs a secure context; fall back for plain-http hosting
+      const ta = document.createElement('textarea')
+      ta.value = text
+      ta.style.position = 'fixed'; ta.style.opacity = '0'
+      document.body.appendChild(ta); ta.select()
+      try { ok = document.execCommand('copy') } catch { /* unsupported */ }
+      ta.remove()
+    }
+    if (!ok) { window.prompt('Salin / Copy:', text); return }
+    const orig = shareBtn.textContent
+    shareBtn.textContent = L('copied')
+    setTimeout(() => { shareBtn.textContent = orig }, 2000)
   })
 
   const csvBtn = document.getElementById('csvBtn')
