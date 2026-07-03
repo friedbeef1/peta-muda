@@ -3,7 +3,7 @@
   "configurations": [
     {
       "name": "peta-muda",
-      "runtimeExecutable": "C:\\Program Files\\nodejs\\node.exe",
+      "runtimeExecutable": "node",
       "runtimeArgs": ["tools/serve.mjs"],
       "port": 8123
     }
