@@ -261,14 +261,37 @@ function sparkline(weeks, seriesList, w = 130, h = 34) {
   if (!vals.length) return ''
   const min = Math.min(...vals), max = Math.max(...vals)
   const span = (max - min) || 1
-  const x = (i) => 2 + (i / Math.max(weeks.length - 1, 1)) * (w - 4)
-  const y = (v) => h - 3 - ((v - min) / span) * (h - 6)
+  const x = (i) => 4 + (i / Math.max(weeks.length - 1, 1)) * (w - 8)
+  const y = (v) => h - 4 - ((v - min) / span) * (h - 8)
   let out = `<svg class="sparkline" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">`
   for (const s of seriesList) {
-    const pts = weeks.map((wk, i) => s.data[wk] != null ? `${x(i).toFixed(1)},${y(s.data[wk]).toFixed(1)}` : null).filter(Boolean)
-    if (pts.length > 1) out += `<polyline points="${pts.join(' ')}" fill="none" stroke="${s.color}" stroke-width="${s.width ?? 2}" stroke-linejoin="round" ${s.dash ? 'stroke-dasharray="3 3"' : ''}/>`
+    const valued = weeks.map((wk, i) => [i, s.data[wk]]).filter(([, v]) => v != null)
+    if (valued.length > 1) {
+      const pts = valued.map(([i, v]) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`)
+      out += `<polyline points="${pts.join(' ')}" fill="none" stroke="${s.color}" stroke-width="${s.width ?? 2}" stroke-linejoin="round" ${s.dash ? 'stroke-dasharray="3 3"' : ''}/>`
+    }
+    // mark the exact pair the % compares: hollow dot + dotted baseline at the
+    // first plotted value, solid dot at the last
+    if (s.mark && valued.length > 1) {
+      const [fi, fv] = valued[0]
+      const [li, lv] = valued[valued.length - 1]
+      out += `<line x1="${x(fi).toFixed(1)}" y1="${y(fv).toFixed(1)}" x2="${w - 4}" y2="${y(fv).toFixed(1)}" stroke="${s.color}" stroke-width="1" stroke-dasharray="2 3" opacity="0.4"/>`
+      out += `<circle cx="${x(fi).toFixed(1)}" cy="${y(fv).toFixed(1)}" r="2" fill="var(--card)" stroke="${s.color}" stroke-width="1.3"/>`
+      out += `<circle cx="${x(li).toFixed(1)}" cy="${y(lv).toFixed(1)}" r="2.6" fill="${s.color}"/>`
+    }
   }
   return out + '</svg>'
+}
+
+// First-vs-last of the plotted window — the same pair the sparkline marks,
+// so the displayed % always matches the drawn line by construction.
+function windowStats(series, weeks) {
+  const valued = weeks.filter(w => series[w] != null)
+  if (valued.length < 2) return null
+  const first = series[valued[0]]
+  const last = series[valued[valued.length - 1]]
+  if (!first) return null
+  return { first, last, perc: +(100 * (last - first) / first).toFixed(1) }
 }
 
 function barRow(label, perc, valText, color = 'var(--ink)') {
@@ -459,28 +482,31 @@ function contestCard(seat) {
 function pricesCard(seat, compact = true) {
   const p = seat.prices
   if (!p?.items?.length) return ''
-  // signal over noise: only the 3 items that rose the most
-  const top = [...p.items]
-    .filter(i => i.change_12w_perc != null)
-    .sort((a, b) => b.change_12w_perc - a.change_12w_perc)
+  // signal over noise: only the 3 items that rose the most across the plotted
+  // window — ranked and labelled by the same first-to-last change the
+  // sparkline marks, so number and line always agree
+  const top = p.items.map(it => {
+    const hasDistrict = it.latest_district != null
+    const series = hasDistrict ? it.series.district : it.series.johor
+    return { it, hasDistrict, series, ws: windowStats(series, p.weeks) }
+  }).filter(e => e.ws)
+    .sort((a, b) => b.ws.perc - a.ws.perc)
     .slice(0, 3)
   if (!top.length) return ''
-  const rows = top.map(it => {
-    const hasDistrict = it.latest_district != null
-    const price = hasDistrict ? it.latest_district : it.latest_johor
+  const rows = top.map(({ it, hasDistrict, series, ws }) => {
     const spark = sparkline(p.weeks, [
       { data: it.series.johor, color: '#c9c9c4', width: 1.5, dash: true },
-      { data: hasDistrict ? it.series.district : it.series.johor, color: 'var(--ink)', width: 2 },
+      { data: series, color: 'var(--ink)', width: 2, mark: true },
     ])
     return `<tr>
       <td><strong>${esc(state.lang === 'bm' ? it.label_bm : it.label_en)}</strong><br><span style="color:var(--muted);font-size:.72rem">${esc(it.unit)}</span></td>
-      <td class="num"><strong>${fmtRM(price)}</strong></td>
+      <td class="num"><strong>${fmtRM(ws.last)}</strong></td>
       <td class="num">${fmtRM(it.latest_johor)}</td>
       <td>${spark}</td>
-      <td class="num">${deltaHtml(it.change_12w_perc)}</td>
+      <td class="num">${deltaHtml(ws.perc)}</td>
     </tr>`
   }).join('')
-  const anyDistrict = top.some(it => it.latest_district != null)
+  const anyDistrict = top.some(e => e.hasDistrict)
   return `<div class="card">
     <h2>${L('prices_here')}</h2>
     <p class="sub">${L('prices_sub', esc(p.district ?? '–'))}${asOfHtml(p.max_date)}</p>
@@ -559,11 +585,14 @@ function raceCard(seat, idx) {
 function shareText(seat) {
   const e = seat.election2026
   const inc = seat.socio.income?.at(-1)
-  const worst = [...seat.prices.items].filter(i => i.change_12w_perc != null).sort((a, b) => b.change_12w_perc - a.change_12w_perc)[0]
+  const worst = seat.prices.items.map(it => {
+    const series = it.latest_district != null ? it.series.district : it.series.johor
+    return { it, ws: windowStats(series, seat.prices.weeks) }
+  }).filter(x => x.ws).sort((a, b) => b.ws.perc - a.ws.perc)[0]
   const lines = [
     `📍 ${seat.code} ${seat.name} — PRN Johor ${e.polling_date === '2026-07-11' ? '11 Julai 2026' : e.polling_date}`,
     e.muda_candidate ? `★ ${L('bloc_candidate')}: ${e.muda_candidate} (${e.bloc_party})` : null,
-    worst ? `🧺 ${worst.label_bm}: ${fmtRM(worst.latest_district ?? worst.latest_johor)} (${worst.change_12w_perc > 0 ? '+' : ''}${worst.change_12w_perc}% / 3 bln)` : null,
+    worst ? `🧺 ${worst.it.label_bm}: ${fmtRM(worst.ws.last)} (${worst.ws.perc > 0 ? '+' : ''}${worst.ws.perc}% / 3 bln)` : null,
     inc ? `💰 ${L('income_median')}: RM${fmtNum(inc.income_median)}` : null,
     `Data terbuka rasmi · ${location.origin}${location.pathname}#/seat/${seat.slug}`,
   ].filter(Boolean)
@@ -600,15 +629,16 @@ function talkingPoints(seat, bench, idx) {
   if (r?.stress != null && r.stress >= 70) {
     pts.push(bm ? `${L('stress_line', r.stress)}.` : `${L('stress_line', r.stress)}.`)
   }
-  const topRisers = [...p.items]
-    .filter(i => i.change_12w_perc != null && i.change_12w_perc >= 3)
-    .sort((a, b) => b.change_12w_perc - a.change_12w_perc)
+  const topRisers = p.items.map(it => {
+    const series = it.latest_district != null ? it.series.district : it.series.johor
+    return { it, ws: windowStats(series, p.weeks) }
+  }).filter(e => e.ws && e.ws.perc >= 3)
+    .sort((a, b) => b.ws.perc - a.ws.perc)
     .slice(0, 3)
-  for (const it of topRisers) {
-    const price = it.latest_district ?? it.latest_johor
+  for (const { it, ws } of topRisers) {
     pts.push(bm
-      ? `Harga <strong>${esc(it.label_bm.toLowerCase())}</strong> naik <strong>${it.change_12w_perc}%</strong> dalam 3 bulan di daerah ${esc(p.district)} (kini ${fmtRM(price)}/${esc(it.unit)}).`
-      : `<strong>${esc(it.label_en)}</strong> price up <strong>${it.change_12w_perc}%</strong> in 3 months in ${esc(p.district)} district (now ${fmtRM(price)}/${esc(it.unit)}).`)
+      ? `Harga <strong>${esc(it.label_bm.toLowerCase())}</strong> naik <strong>${ws.perc}%</strong> dalam 3 bulan di daerah ${esc(p.district)} (kini ${fmtRM(ws.last)}/${esc(it.unit)}).`
+      : `<strong>${esc(it.label_en)}</strong> price up <strong>${ws.perc}%</strong> in 3 months in ${esc(p.district)} district (now ${fmtRM(ws.last)}/${esc(it.unit)}).`)
   }
   const inc = seat.socio.income?.at(-1)
   if (inc && bench.income_median && inc.income_median < bench.income_median * 0.9) {
