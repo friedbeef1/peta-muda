@@ -45,21 +45,31 @@ no accounts, no env vars needed.
 
 The repo is **private** (it holds opposition research in `data/manual/issues.json`
 and turnout strategy in `tools/analyze_muda.mjs`). Free GitHub Pages does **not**
-serve private repos, so pick one:
+serve private repos, so the chosen setup splits refresh and deploy:
 
-- **Cloudflare Pages / Netlify (free, recommended):** connect the private repo,
-  set build command `npm install && npm run pipeline`, output directory `site`.
-  Both can rebuild on a schedule (nightly) to refresh prices.
-- **GitHub Pages:** needs GitHub Pro ($4/mo) to publish from a private repo. The
-  workflow at `.github/workflows/refresh.yml` already does nightly pipeline +
-  Pages deploy — just enable Pages (Settings → Pages → Source: GitHub Actions).
-- **Keep it fully private:** skip hosting; run `npm run serve` locally for
-  internal campaign use.
+- **Refresh (data):** `.github/workflows/refresh.yml` runs the pipeline nightly
+  (cron `30 13 * * *` = 21:30 MYT) and commits the regenerated `site/data`. This
+  job is free on the private-repo Actions tier (~150 of 2,000 min/month). It does
+  **not** deploy — Cloudflare handles that.
+- **Deploy (hosting) — Cloudflare Pages (free, chosen):** connect the private
+  repo in the Cloudflare dashboard with **build command = _(none)_** and
+  **output directory = `site`** (the data is committed, so no build is needed —
+  Cloudflare just serves the static folder). Cloudflare auto-redeploys on every
+  push, so the nightly refresh commit triggers a fresh deploy. Free tier is 500
+  builds/month; a nightly deploy uses ~30. Keeps the repo private, no GitHub Pro.
+- **Alternatives:** GitHub Pages needs Pro ($4/mo) for a private repo (and Pages
+  must be enabled: Settings → Pages → Source: GitHub Actions). Or make the repo
+  public for free GitHub Pages — but that exposes the strategy source files.
+  Or skip hosting entirely and run `npm run serve` locally for internal use.
 
-⚠️ Note: the deployed *site* exposes the Field/Analysis tabs (doorstep lines,
-turnout strategy) to anyone with the URL. If that's meant to stay internal,
-password-protect the host (Cloudflare Access / Netlify password) or only serve
-locally.
+⚠️ Two caveats:
+- The deployed *site* exposes the Field/Analysis tabs (doorstep lines, turnout
+  strategy) to anyone with the URL. To keep it internal, put Cloudflare Access
+  (free) in front of the Pages project, or only serve locally.
+- GitHub **disables scheduled workflows after 60 days of no repo activity** (the
+  bot's own nightly commits do **not** reset this timer). If the repo goes quiet
+  for 60 days the refresh cron silently pauses until someone pushes or re-enables
+  it in the Actions tab.
 
 ## Key context (folded in from build-machine memory)
 
