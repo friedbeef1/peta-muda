@@ -1,6 +1,7 @@
-# Nightly data refresh + GitHub Pages deploy.
-# Runs the pipeline (prices update daily ~12:00 UTC at source), commits the
-# regenerated site/data, and publishes site/ to Pages.
+# Nightly data refresh. Runs the pipeline (prices update daily ~12:00 UTC at
+# source) and commits the regenerated site/data. Deployment is handled by
+# Cloudflare Pages, which auto-redeploys the static site/ on every push, so
+# this workflow only needs to refresh the data and push.
 name: refresh-data
 
 on:
@@ -10,12 +11,6 @@ on:
 
 permissions:
   contents: write
-  pages: write
-  id-token: write
-
-concurrency:
-  group: pages
-  cancel-in-progress: false
 
 jobs:
   refresh:
@@ -37,16 +32,3 @@ jobs:
           git add site/data
           git diff --cached --quiet || git commit -m "data: nightly refresh $(date -u +%F)"
           git push
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: site
-  deploy:
-    needs: refresh
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - id: deployment
-        uses: actions/deploy-pages@v4

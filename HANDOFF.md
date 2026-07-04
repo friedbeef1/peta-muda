@@ -45,21 +45,31 @@ no accounts, no env vars needed.
 
 The repo is **private** (it holds opposition research in `data/manual/issues.json`
 and turnout strategy in `tools/analyze_muda.mjs`). Free GitHub Pages does **not**
-serve private repos, so pick one:
+serve private repos, so the chosen setup splits refresh and deploy:
 
-- **Cloudflare Pages / Netlify (free, recommended):** connect the private repo,
-  set build command `npm install && npm run pipeline`, output directory `site`.
-  Both can rebuild on a schedule (nightly) to refresh prices.
-- **GitHub Pages:** needs GitHub Pro ($4/mo) to publish from a private repo. The
-  workflow at `.github/workflows/refresh.yml` already does nightly pipeline +
-  Pages deploy — just enable Pages (Settings → Pages → Source: GitHub Actions).
-- **Keep it fully private:** skip hosting; run `npm run serve` locally for
-  internal campaign use.
+- **Refresh (data):** `.github/workflows/refresh.yml` runs the pipeline nightly
+  (cron `30 13 * * *` = 21:30 MYT) and commits the regenerated `site/data`. This
+  job is free on the private-repo Actions tier (~150 of 2,000 min/month). It does
+  **not** deploy — Cloudflare handles that.
+- **Deploy (hosting) — Cloudflare Pages (free, chosen):** connect the private
+  repo in the Cloudflare dashboard with **build command = _(none)_** and
+  **output directory = `site`** (the data is committed, so no build is needed —
+  Cloudflare just serves the static folder). Cloudflare auto-redeploys on every
+  push, so the nightly refresh commit triggers a fresh deploy. Free tier is 500
+  builds/month; a nightly deploy uses ~30. Keeps the repo private, no GitHub Pro.
+- **Alternatives:** GitHub Pages needs Pro ($4/mo) for a private repo (and Pages
+  must be enabled: Settings → Pages → Source: GitHub Actions). Or make the repo
+  public for free GitHub Pages — but that exposes the strategy source files.
+  Or skip hosting entirely and run `npm run serve` locally for internal use.
 
-⚠️ Note: the deployed *site* exposes the Field/Analysis tabs (doorstep lines,
-turnout strategy) to anyone with the URL. If that's meant to stay internal,
-password-protect the host (Cloudflare Access / Netlify password) or only serve
-locally.
+⚠️ Two caveats:
+- The deployed *site* exposes the Field/Analysis tabs (doorstep lines, turnout
+  strategy) to anyone with the URL. To keep it internal, put Cloudflare Access
+  (free) in front of the Pages project, or only serve locally.
+- GitHub **disables scheduled workflows after 60 days of no repo activity** (the
+  bot's own nightly commits do **not** reset this timer). If the repo goes quiet
+  for 60 days the refresh cron silently pauses until someone pushes or re-enables
+  it in the Actions tab.
 
 ## Key context (folded in from build-machine memory)
 
@@ -110,9 +120,44 @@ rows after 18 July. The demographics parquet already carries every state.
 ## After polling day (11 July)
 
 SE-16 rows flip from `pending` to results within days of the count. The pipeline
-already handles this (the contest moves from `election2026.ballot` into
-`history`, and the Brief tab shows an official-results card). Just re-run the
-pipeline or let the scheduled job refresh.
+handles this and the flip is now hardened + regression-tested by an offline
+simulator — see "Results-day simulator" below. The contest moves from
+`election2026.ballot` into `history`, `election2026.result_date` is set, and the
+Brief tab shows an official-results card. Just re-run the pipeline or let the
+scheduled job refresh.
+
+## Results-day simulator (`tools/sim/`, `npm run sim`)
+
+Replays the real pipeline offline against source fixtures rebuilt from the
+committed `site/data`, rewriting the 2026 rows per scenario (pending, full-flip,
+partial-flip, stats-lag, garbage mid-count, appended-rows). Assertions live in
+`tools/sim/verify.mjs`; `.sim/` is git-ignored. Run it before touching anything
+in the flip path (`history.mjs` classifier, `run.mjs` contest2026 / integrity
+gate, `app.js` `contestCard`). See `tools/sim/README.md`.
+
+## Candidate record layer ("wakilku angle")
+
+**Phase 1 is built** (Field tab → "Candidate record" card), entirely from data
+we already fetch — no new sources, no API keys. `loadCareers`
+(`pipeline/steps/history.mjs`) pulls every candidate's contest history (seat,
+party, vote share, result, 1955→now) keyed by `candidate_uid`;
+`partyTimeline()` collapses it into party "stints" exposed as
+`career.party_timeline`. `recordCard`/`recordRow` in `site/app.js` render each
+2026 candidate's CV (contests/wins), party path, and a **party-switch callout**
+(Malaysia's anti-hopping law makes this a sharp, sourced line). Renders only
+while the ballot is live (campaign-time); covered by the sim's record-layer
+assertions in `tools/sim/verify.mjs`.
+
+Note: the card shows full paths + hop callouts only after a pipeline rebuild
+populates `party_timeline`; on pre-rebuild data it degrades to the CV summary
+(no crash). The nightly job fills it in.
+
+**Deferred (needs a decision):** social handles, bios, occupation — no keyless
+source exists, so this would be a manual-curated, cited
+`data/manual/candidates.json` keyed by `candidate_uid` (merged like `se16.json`)
+and fact-checked like `issues.json`. Do NOT wire a live social API — it breaks
+the "no keys, no accounts" guarantee. Possible further open-data phases: full
+vote-share/majority trajectory charts, incumbent attendance if a source appears.
 
 ## Verification status
 
