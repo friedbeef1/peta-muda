@@ -14,6 +14,7 @@ import { loadKawasanku } from './steps/kawasanku.mjs'
 import { loadSocio, loadDunParlimen, loadCpi, loadFuel } from './steps/socio.mjs'
 import { loadPrices, mergeDistrict } from './steps/prices.mjs'
 import { loadGeo } from './steps/geo.mjs'
+import { loadCrime } from './steps/crime.mjs'
 
 const OUT = path.join('site', 'data')
 const t0 = Date.now()
@@ -58,6 +59,8 @@ const { socio } = await loadSocio(seats)
 log('loading CPI + fuel')
 const cpi = await loadCpi()
 const fuel = await loadFuel()
+log('loading crime (Johor context)')
+const crime = await loadCrime()
 log('loading PriceCatcher (this downloads a few MB per month on first run)')
 const prices = await loadPrices()
 log(`basket: ${prices.basket.map(b => `${b.key}=#${b.code}(${b.johor_coverage})`).join(' ')}`)
@@ -268,6 +271,7 @@ const index = {
   price_months: prices.months_used,
   fuel,
   cpi,
+  johor_context: { crime },
   source_health: health,
   attribution: [
     { name: 'ElectionData.MY (Malaysian Election Corpus, CC0)', url: 'https://electiondata.my' },
