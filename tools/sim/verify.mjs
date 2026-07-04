@@ -62,6 +62,29 @@ export async function verifyScenario(scenario, simDataDir, committedDataDir) {
   const codes = Object.keys(sim.seats).sort()
   ok(codes.length === 56, `expected 56 seats, got ${codes.length}`)
 
+  // candidate-record layer: every candidate with a career must carry an
+  // ordered party_timeline, and a known cross-party mover must show >1 party
+  for (const code of codes) {
+    for (const b of sim.seats[code].election2026?.ballot ?? []) {
+      if (!b.career) continue
+      const tl = b.career.party_timeline
+      ok(Array.isArray(tl), `${code}/${b.name}: career missing party_timeline`)
+      if (Array.isArray(tl)) {
+        const years = tl.map(s => s.from)
+        ok(years.every((y, i) => i === 0 || y >= years[i - 1]), `${code}/${b.name}: party_timeline not oldest-first`)
+        ok(tl.every((s, i) => i === 0 || s.party !== tl[i - 1].party), `${code}/${b.name}: adjacent same-party stints not merged`)
+      }
+    }
+  }
+  {
+    // N.44 Larkin carries Suhaizan bin Kaiat (PAS → AMANAH), our timeline fixture
+    const suhaizan = (sim.seats['N.44']?.election2026?.ballot ?? []).find(b => b.name.includes('Suhaizan'))
+    if (suhaizan) {
+      const parties = new Set((suhaizan.career?.party_timeline ?? []).map(s => s.party))
+      ok(parties.size > 1, `N.44 Suhaizan should show a multi-party timeline, got ${[...parties].join('/')}`)
+    }
+  }
+
   if (scenario === 'pending') {
     // fidelity baseline: simulated output must reproduce the committed data
     const com = await loadDir(committedDataDir)

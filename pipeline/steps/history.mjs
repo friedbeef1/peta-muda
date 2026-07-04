@@ -121,7 +121,29 @@ export async function loadCareers(uids) {
       won: contests.filter(c => c.result.startsWith('won')).length,
       last: contests[0],
       contests: contests.slice(0, 8),
+      party_timeline: partyTimeline(contests),
     })
   }
   return out
+}
+
+// Collapse a candidate's contest list into consecutive party "stints" (oldest
+// first), so the record can show "PAS 2004–2013 → AMANAH 2018–now". Contests
+// share a date when someone stands for a parlimen AND a state seat the same
+// day; those must read as one stint, not a switch — so we bucket by year and
+// take the party of the year's first contest. Coalition realignment is not a
+// party switch, so this tracks the party label the candidate stood under.
+function partyTimeline(contests) {
+  const byYear = new Map() // year -> party of that year's earliest contest
+  for (const c of [...contests].sort((a, b) => a.date.localeCompare(b.date))) {
+    const year = c.date.slice(0, 4)
+    if (!byYear.has(year)) byYear.set(year, c.party)
+  }
+  const stints = []
+  for (const [year, party] of byYear) {
+    const tail = stints[stints.length - 1]
+    if (tail && tail.party === party) tail.to = year
+    else stints.push({ party, from: year, to: year })
+  }
+  return stints
 }

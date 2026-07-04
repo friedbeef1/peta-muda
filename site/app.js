@@ -44,6 +44,13 @@ const STR = {
     results_sub: 'Keputusan rasmi — data ElectionData.MY',
     first_time: 'Calon kali pertama',
     career_line: (c, w, el, yr) => `Rekod: ${c} tandingan, ${w} menang · terakhir ${el} (${yr})`,
+    record_title: 'Rekod calon',
+    record_sub: 'Rekod pilihan raya rasmi setiap calon di kerusi ini — sumber ElectionData.MY (semak sebelum guna)',
+    record_summary: (c, w) => `${c} tandingan · ${w} menang`,
+    record_firsttimer: 'Muka baharu — tiada rekod pilihan raya terdahulu',
+    record_hop: (n) => `Bertukar parti ${n} kali`,
+    record_switchedin: (p) => `Bertanding atas tiket ${p} buat kali pertama tahun ini`,
+    record_now: 'kini',
     race_title: 'Harga vs pendapatan vs inflasi rasmi',
     race_sub: 'Kadar perubahan setahun — harga dapur diukur sejak PRN lalu (Mac 2022)',
     basket_rate: 'Bakul dapur',
@@ -144,6 +151,13 @@ const STR = {
     results_sub: 'Official result — ElectionData.MY',
     first_time: 'First-time candidate',
     career_line: (c, w, el, yr) => `Record: ${c} contests, ${w} won · last ${el} (${yr})`,
+    record_title: 'Candidate record',
+    record_sub: 'Each candidate’s official electoral record for this seat — source ElectionData.MY (verify before use)',
+    record_summary: (c, w) => `${c} contests · ${w} won`,
+    record_firsttimer: 'New face — no prior electoral record',
+    record_hop: (n) => `Switched party ${n} times`,
+    record_switchedin: (p) => `Standing on the ${p} ticket for the first time this year`,
+    record_now: 'now',
     race_title: 'Prices vs income vs official inflation',
     race_sub: 'Annual rates of change — kitchen prices measured since the last election (Mar 2022)',
     basket_rate: 'Kitchen basket',
@@ -817,6 +831,61 @@ function issuesCard(seat) {
   </div>`
 }
 
+// The party path a candidate has stood under, oldest→now: the pipeline's
+// historical stints plus this year's ticket. Consecutive same-party stints are
+// already merged upstream; here we just graft on 2026.
+function partyPath(b) {
+  const stints = (b.career?.party_timeline ?? []).map(s => ({ ...s }))
+  const tail = stints[stints.length - 1]
+  if (tail && tail.party === b.party) tail.to = L('record_now')
+  else stints.push({ party: b.party, from: '2026', to: L('record_now') })
+  return stints
+}
+
+// One candidate's electoral record: CV summary + party path + a party-switch
+// callout. The facts are the attack line — presented identically for every
+// candidate so it stays sourced and defensible, bloc candidate just starred.
+function recordRow(b) {
+  const isBloc = b.party === 'MUDA' || b.party === 'PSM'
+  const c = b.career
+  const stints = partyPath(b)
+  let switches = 0
+  for (let i = 1; i < stints.length; i++) if (stints[i].party !== stints[i - 1].party) switches++
+  const histTail = (b.career?.party_timeline ?? []).slice(-1)[0]
+  const switchedIn = histTail && histTail.party !== b.party
+  const pathHtml = stints.map(s => {
+    const yr = s.from === s.to ? esc(s.from) : `${esc(s.from)}–${esc(s.to)}`
+    return `${partyBadge(s.party)}<span style="color:var(--muted);font-size:.7rem;margin-left:.2rem">${yr}</span>`
+  }).join('<span style="color:var(--muted);margin:0 .3rem">→</span>')
+  const callout = switchedIn ? L('record_switchedin', b.party) : switches > 0 ? L('record_hop', switches) : null
+  return `<div style="padding:.55rem 0;border-top:1px solid var(--line)">
+    <div><strong>${esc(b.name)}</strong>${isBloc ? ' <span title="Blok Progresif" style="color:var(--accent)">★</span>' : ''}
+      <span style="color:var(--muted);font-size:.75rem">· ${c ? esc(L('record_summary', c.contested, c.won)) : esc(L('record_firsttimer'))}</span></div>
+    <div style="margin-top:.3rem;display:flex;flex-wrap:wrap;align-items:center;gap:.15rem">${pathHtml}</div>
+    ${callout ? `<div style="margin-top:.3rem;font-size:.76rem;color:var(--warn,#b45309)">⚑ ${esc(callout)}</div>` : ''}
+  </div>`
+}
+
+// Candidate-record card (campaign-time attack layer). Only renders while the
+// 2026 ballot is live — careers are fetched for pending candidates only, and
+// once results are in the record is moot. Bloc candidate first, then by
+// experience so the sharpest contrasts sit together.
+function recordCard(seat) {
+  const ballot = seat.election2026?.ballot
+  if (!ballot?.length) return ''
+  const ordered = [...ballot].sort((a, b) => {
+    const aBloc = a.party === 'MUDA' || a.party === 'PSM'
+    const bBloc = b.party === 'MUDA' || b.party === 'PSM'
+    if (aBloc !== bBloc) return aBloc ? -1 : 1
+    return (b.career?.contested ?? 0) - (a.career?.contested ?? 0)
+  })
+  return `<div class="card">
+    <h2>${L('record_title')}</h2>
+    <p class="sub">${L('record_sub')}</p>
+    ${ordered.map(recordRow).join('')}
+  </div>`
+}
+
 function renderField(seat, bench, idx) {
   const demo = seat.demographics.find(d => d.election === 'JHR-SE-16') ?? seat.demographics[0]
   const pts = talkingPoints(seat, bench, idx)
@@ -860,6 +929,7 @@ function renderField(seat, bench, idx) {
       <p class="sub">${L('tp_sub')}</p>
       <ul class="points">${pts.map(p => `<li>${p}</li>`).join('')}</ul>
     </div>
+    ${recordCard(seat)}
     ${demoHtml}
     ${premHtml}`
 }
