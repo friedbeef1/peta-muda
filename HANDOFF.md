@@ -120,9 +120,46 @@ rows after 18 July. The demographics parquet already carries every state.
 ## After polling day (11 July)
 
 SE-16 rows flip from `pending` to results within days of the count. The pipeline
-already handles this (the contest moves from `election2026.ballot` into
-`history`, and the Brief tab shows an official-results card). Just re-run the
-pipeline or let the scheduled job refresh.
+handles this and the flip is now hardened + regression-tested by an offline
+simulator — see "Results-day simulator" below. The contest moves from
+`election2026.ballot` into `history`, `election2026.result_date` is set, and the
+Brief tab shows an official-results card. Just re-run the pipeline or let the
+scheduled job refresh.
+
+## Results-day simulator (`tools/sim/`, `npm run sim`)
+
+Replays the real pipeline offline against source fixtures rebuilt from the
+committed `site/data`, rewriting the 2026 rows per scenario (pending, full-flip,
+partial-flip, stats-lag, garbage mid-count, appended-rows). Assertions live in
+`tools/sim/verify.mjs`; `.sim/` is git-ignored. Run it before touching anything
+in the flip path (`history.mjs` classifier, `run.mjs` contest2026 / integrity
+gate, `app.js` `contestCard`). See `tools/sim/README.md`.
+
+## Planned: candidate record layer ("wakilku angle", Phase 1 only)
+
+Not built yet — captured here so it isn't lost. Goal: a per-candidate record
+folded into the attack plan (Field tab) and Analysis tab, done entirely from our
+existing open data — **no new sources, no API keys** (the social-media / bio
+angle was explicitly deferred to keep the keyless guarantee).
+
+Everything needed is **already fetched**: `loadCareers` (`pipeline/steps/history.mjs`)
+pulls every candidate's full contest history (seat, party, vote share, result,
+1955→now) keyed by the lake's stable `candidate_uid`; today it's collapsed into
+a one-line `career_line`. Phase 1 surfaces it:
+
+- **Full electoral CV** per 2026 candidate (all contests, not just the latest).
+- **Party-hop detector** — we have *party-per-contest*, so flag candidates who
+  changed party between contests (a strong, fully-sourced line given Malaysia's
+  anti-hopping law). Compute in the pipeline; expose a `career.party_history`.
+- **Vote-share / majority trajectory** — incumbent decline, seat-hopping.
+- **Attack framing** — contrast each opponent's record against the bloc
+  candidate's, doorstep-ready, same source-citation + disclaimer discipline as
+  `data/manual/issues.json`.
+
+Deferred (needs a decision later): social handles, bios, occupation. No keyless
+source exists — would be a manual-curated, cited `data/manual/candidates.json`
+keyed by `candidate_uid` (merged like `se16.json`), fact-checked like issues.
+Do NOT wire a live social API — it breaks the "no keys, no accounts" guarantee.
 
 ## Verification status
 
