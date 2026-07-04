@@ -165,3 +165,25 @@ All displayed numbers were independently re-derived from raw sources (31/31
 audit checks exact). No AI touches the data path — the pipeline is deterministic
 Node computing sums/medians over public files. The in-app disclaimer asks users
 to verify facts before publishing campaign material.
+
+## Pro-MUDA edition (`EDITION=muda`)
+
+The app builds in two editions from one codebase (see the approved plan). `main`
+and the default build are **neutral**; `EDITION=muda node pipeline/run.mjs` adds a
+pro-MUDA advocacy layer ("small party, big bite"):
+- `pipeline/config.mjs` `EDITION` flag (default `neutral`); emitted as
+  `index.json.edition`.
+- **Neutral, ships in both:** `johor_context.undi18` — the statewide 18–20 cohort
+  (sum of `age_18_20`) that the 2019 Undi18 reform opened up.
+- **Advocacy, muda-only:** `johor_context.muda` (MUDA's 2022 Johor saluran record)
+  and `muda_record` (curated `data/manual/muda_record.json`). UI gated on
+  `idx.edition==='muda'` (`mudaHomeCard`/`mudaSeatCard` in `site/app.js`).
+- **Honesty guardrails (fact-checked, in `muda_record.json`):** attribute the 2019
+  voting-age reform to **Syed Saddiq as 2019 minister, not the MUDA party** (party
+  founded 2020); "~5.8M newly-registered", never "young voters"; anti-hopping =
+  advocacy, not authorship. `npm run sim` (and `EDITION=muda npm run sim`) assert
+  the gating + the guardrail + the Undi18 cross-check.
+- **Deploy:** a 2nd Cloudflare Pages project on this repo with build env
+  `EDITION=muda`, gated to a few people via **Cloudflare Access** (Zero Trust →
+  Access → self-hosted app → email allowlist, free ≤50). `main`'s neutral project
+  is untouched. Note: the curated `muda_record.json` still sits in the public repo.

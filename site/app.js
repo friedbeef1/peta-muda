@@ -51,6 +51,9 @@ const STR = {
     record_hop: (n) => `Bertukar parti ${n} kali`,
     record_switchedin: (p) => `Bertanding atas tiket ${p} buat kali pertama tahun ini`,
     record_now: 'kini',
+    muda_title: 'MUDA — parti kecil, kesan besar',
+    muda_record_title: 'Rekod kebangsaan (bersumber)',
+    muda_seat_title: 'Kesan MUDA di kerusi ini',
     race_title: 'Harga vs pendapatan vs inflasi rasmi',
     race_sub: 'Kadar perubahan setahun — harga dapur diukur sejak PRN lalu (Mac 2022)',
     basket_rate: 'Bakul dapur',
@@ -158,6 +161,9 @@ const STR = {
     record_hop: (n) => `Switched party ${n} times`,
     record_switchedin: (p) => `Standing on the ${p} ticket for the first time this year`,
     record_now: 'now',
+    muda_title: 'MUDA — small party, big bite',
+    muda_record_title: 'National record (sourced)',
+    muda_seat_title: "MUDA's footprint in this seat",
     race_title: 'Prices vs income vs official inflation',
     race_sub: 'Annual rates of change — kitchen prices measured since the last election (Mar 2022)',
     basket_rate: 'Kitchen basket',
@@ -397,6 +403,56 @@ function countdownCard(idx) {
   return `<div class="card"><div class="countdown">${inner}</div></div>`
 }
 
+// ---- pro-MUDA edition (EDITION=muda) advocacy layer, gated on idx.edition ----
+function mudaRecordList(rec) {
+  const bm = state.lang === 'bm'
+  return (rec?.national ?? []).map(it => {
+    const claim = bm ? (it.claim_bm ?? it.claim_en) : (it.claim_en ?? it.claim_bm)
+    const receipt = bm ? (it.receipt_bm ?? it.receipt_en) : (it.receipt_en ?? it.receipt_bm)
+    const refs = (it.sources ?? []).map((u, i) =>
+      ` <a href="${esc(u)}" target="_blank" rel="noopener" style="color:var(--muted)">[${i + 1}]</a>`).join('')
+    const v = it.verdict ? `<span class="badge" style="background:var(--lain);font-size:.62rem">${esc(it.verdict)}</span> ` : ''
+    return `<li>${v}<strong>${esc(claim ?? '')}</strong>${receipt ? `<br><span style="color:var(--muted);font-size:.78rem">${esc(receipt)}</span>` : ''}${refs}</li>`
+  }).join('')
+}
+
+function mudaHomeCard(idx) {
+  if (idx.edition !== 'muda') return ''
+  const bm = state.lang === 'bm'
+  const u = idx.johor_context?.undi18
+  const m = idx.johor_context?.muda
+  const rec = idx.muda_record
+  const headline = rec ? (bm ? rec.headline_bm : rec.headline_en) : L('muda_title')
+  const sub = rec ? (bm ? rec.sub_bm : rec.sub_en) : ''
+  const stats = []
+  if (u) stats.push(`<div style="min-width:130px"><div style="font-size:1.7rem;font-weight:800;color:var(--accent)">${fmtNum(u.total_18_20)}</div><div style="color:var(--muted);font-size:.72rem">${bm ? 'pengundi 18–20 tahun di daftar Johor 2026 — kohort yang dibuka oleh reformasi Undi18 2019' : "voters aged 18–20 on Johor's 2026 roll — the cohort the 2019 Undi18 reform opened up"}</div></div>`)
+  if (m) stats.push(`<div style="min-width:130px"><div style="font-size:1.7rem;font-weight:800;color:var(--accent)">${m.won}/${m.seats_contested}</div><div style="color:var(--muted);font-size:.72rem">${bm ? `kerusi Johor dimenangi MUDA pada 2022 (purata ${m.avg_perc}% undi)` : `Johor seats MUDA won in 2022 (avg ${m.avg_perc}% of the vote)`}</div></div>`)
+  return `<div class="card" style="border:2px solid var(--accent)">
+    <h2>${esc(headline)}</h2>
+    ${sub ? `<p class="sub">${esc(sub)}</p>` : ''}
+    ${stats.length ? `<div style="display:flex;gap:1.2rem;flex-wrap:wrap;margin:.6rem 0 .2rem">${stats.join('')}</div>` : ''}
+    ${rec ? `<h3>${L('muda_record_title')}</h3><ul class="points">${mudaRecordList(rec)}</ul>` : ''}
+  </div>`
+}
+
+function mudaSeatCard(seat, idx) {
+  if (idx.edition !== 'muda') return ''
+  const bm = state.lang === 'bm'
+  const demo = seat.demographics.find(d => d.election === 'JHR-SE-16') ?? seat.demographics[0]
+  const n = demo?.age?.age_18_20 ?? null
+  const perc = n != null && demo?.voters_total ? (100 * n / demo.voters_total).toFixed(1) : null
+  const mc = (idx.johor_context?.muda?.contests ?? []).find(c => c.code === seat.code)
+  if (n == null && !mc) return ''
+  return `<div class="card" style="border:2px solid var(--accent)">
+    <h2>${L('muda_seat_title')}</h2>
+    <ul class="points">
+      ${n != null ? `<li><strong>${fmtNum(n)}</strong> ${bm ? 'pengundi 18–20 tahun' : 'voters aged 18–20'}${perc ? ` (${perc}%)` : ''} ${bm ? 'di kerusi ini — dibuka oleh Undi18 (Syed Saddiq, 2019)' : 'in this seat — opened up by Undi18 (Syed Saddiq, 2019)'}</li>` : ''}
+      ${mc ? `<li>${bm ? 'MUDA bertanding di sini pada 2022' : 'MUDA contested here in 2022'}: <strong>${mc.perc}%</strong>${mc.won ? ` — <strong style="color:var(--accent)">${bm ? 'MENANG' : 'WON'}</strong>` : ''}</li>` : ''}
+    </ul>
+  </div>`
+}
+
+
 async function renderHome() {
   const idx = await loadIndex()
   const featured = idx.seats.filter(s => s.featured)
@@ -406,6 +462,7 @@ async function renderHome() {
   app.innerHTML = `
     <p class="sub" style="margin:2px 0 12px;color:var(--muted)">${L('tagline')}</p>
     ${countdownCard(idx)}
+    ${mudaHomeCard(idx)}
 
     <div class="card">
       <h2>${L('featured')}</h2>
@@ -924,6 +981,7 @@ function renderField(seat, bench, idx) {
   return `
     ${storyCard(seat, bench, idx)}
     ${issuesCard(seat)}
+    ${mudaSeatCard(seat, idx)}
     <div class="card">
       <h2>${L('talking_points')}</h2>
       <p class="sub">${L('tp_sub')}</p>

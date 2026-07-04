@@ -85,6 +85,28 @@ export async function verifyScenario(scenario, simDataDir, committedDataDir) {
     }
   }
 
+  // ---- MUDA edition gating + Undi18 rollup consistency (all scenarios) ----
+  {
+    const jc = sim.index.johor_context ?? {}
+    ok(jc.undi18?.total_18_20 > 0, 'undi18 rollup missing/zero')
+    let sum1820 = 0
+    for (const code of codes) {
+      const rolls = sim.seats[code].demographics ?? []
+      const d = rolls.find(x => x.election === 'JHR-SE-16') ?? rolls[0]
+      sum1820 += d?.age?.age_18_20 ?? 0
+    }
+    ok(jc.undi18?.total_18_20 === sum1820, `undi18 total ${jc.undi18?.total_18_20} != seat sum ${sum1820}`)
+    if (sim.index.edition === 'muda') {
+      ok((sim.index.muda_record?.national?.length ?? 0) > 0, 'muda edition missing muda_record.national')
+      ok((jc.muda?.seats_contested ?? 0) > 0, 'muda edition missing johor_context.muda')
+      const txt = JSON.stringify(sim.index.muda_record ?? {})
+      ok(!/MUDA (passed|tabled|meluluskan|membentangkan) undi18/i.test(txt), 'guardrail: Undi18 must attribute to Syed Saddiq, not the MUDA party')
+    } else {
+      ok(sim.index.muda_record == null, 'neutral edition must omit muda_record')
+      ok(jc.muda == null, 'neutral edition must omit johor_context.muda')
+    }
+  }
+
   if (scenario === 'pending') {
     // fidelity baseline: simulated output must reproduce the committed data
     const com = await loadDir(committedDataDir)

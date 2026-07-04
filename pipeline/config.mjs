@@ -2,6 +2,10 @@
 
 export const STATE = 'Johor'
 
+// Build edition: 'neutral' (default, the public data tool) or 'muda' (the
+// pro-MUDA advocacy build). Set via `EDITION=muda node pipeline/run.mjs`.
+export const EDITION = process.env.EDITION === 'muda' ? 'muda' : 'neutral'
+
 export const ELECTION_2026 = {
   id: 'JHR-SE-16',
   name_bm: 'Pilihan Raya Negeri Johor (PRN 2026)',
