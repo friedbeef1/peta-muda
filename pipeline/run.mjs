@@ -76,6 +76,33 @@ try {
   issuesManual = JSON.parse(await readFile(path.join('data', 'manual', 'issues.json'), 'utf8'))
 } catch { log('no manual issues.json, skipping local issues') }
 
+// ---- results-integrity gate ----
+// Any contest that classifies as completed inside the 2026 election window
+// must carry a coherent official result (exactly one winner, real votes for
+// contested seats). A mid-count lake state that slips past the classifier
+// must never be committed and served as official — refuse to publish instead.
+{
+  const nom26 = manual.election?.nomination_date ?? ELECTION_2026.nomination_date
+  const today = new Date().toISOString().slice(0, 10)
+  const problems = []
+  for (const seat of seats) {
+    for (const c of history.get(seat.code) ?? []) {
+      if (c.status === 'upcoming' && c.date < today) {
+        log(`WARNING: ${seat.code} contest dated ${c.date} still unsettled (pending/blank rows or zero votes) — kept as upcoming, not published as a result`)
+      }
+      if (c.status !== 'completed' || c.date < nom26) continue
+      const winners = c.ballot.filter(b => (b.result ?? '').startsWith('won')).length
+      const totalVotes = c.ballot.reduce((a, b) => a + (b.votes ?? 0), 0)
+      if (winners !== 1) problems.push(`${seat.code} ${c.date}: ${winners} winner rows`)
+      if (totalVotes === 0 && c.ballot.length > 1) problems.push(`${seat.code} ${c.date}: contested seat with zero total votes`)
+    }
+  }
+  if (problems.length) {
+    console.error(`SANITY FAIL: incoherent 2026 results, refusing to publish:\n  ${problems.join('\n  ')}`)
+    process.exit(1)
+  }
+}
+
 // ---- assemble ----
 await mkdir(path.join(OUT, 'seats'), { recursive: true })
 
@@ -133,15 +160,23 @@ for (const seat of seats) {
   const upcoming = hist.find(c => c.status === 'upcoming') ?? null
   const completed = hist.filter(c => c.status === 'completed')
   const last = completed[0] ?? null
+  // the 2026 contest stays identifiable after results land, so bloc identity
+  // (featured star, candidate name, party) survives the pending→results flip
+  const poll26 = manual.election?.polling_date ?? ELECTION_2026.polling_date
+  const contest2026 = upcoming ?? completed.find(c => c.date === poll26) ?? null
   const priceBlock = priceBlockFor(seat)
   const manualSeat = manual.seats?.[seat.code] ?? null
 
   const youth = current ? +((100 * (current.age.age_18_20 + current.age.age_21_29)) / current.voters_total).toFixed(1) : null
   // Progressive Bloc candidate on the 2026 ballot (MUDA or PSM, from live data)
-  const blocCandidate = upcoming?.ballot.find(b => b.party === 'MUDA' || b.party === 'PSM') ?? null
+  const blocCandidate = contest2026?.ballot.find(b => b.party === 'MUDA' || b.party === 'PSM') ?? null
   // a seat is featured if configured as a target OR a bloc candidate is on the ballot
   const featured = seat.featured || !!blocCandidate
   const ballot2026 = upcoming ? upcoming.ballot.map(b => ({ ...b, career: careers.get(b.uid) ?? null })) : null
+  // authoritative "results are in" marker: the 2026 contest exists and has
+  // settled into history. The frontend keys off this instead of guessing by
+  // comparing dates, so a later by-election in the seat can't be mislabelled.
+  const result_date = !upcoming && contest2026 ? contest2026.date : null
 
   const seatJson = {
     ...seat,
@@ -153,9 +188,10 @@ for (const seat of seats) {
       ...(manualSeat ?? {}),
       is_target: featured,
       ballot: ballot2026,
+      result_date,
       voters_total: upcoming?.voters_total ?? current?.voters_total ?? null,
       muda_candidate: blocCandidate?.name ?? manualSeat?.muda_candidate ?? null,
-      bloc_party: blocCandidate?.party ?? null,
+      bloc_party: blocCandidate?.party ?? manualSeat?.bloc ?? null,
     },
     demographics: demo,
     history: completed,
@@ -176,20 +212,24 @@ for (const seat of seats) {
     kpdn_district: priceBlock.district, featured,
     muda_candidate: blocCandidate?.name ?? manualSeat?.muda_candidate ?? null,
     bloc_party: blocCandidate?.party ?? manualSeat?.bloc ?? null,
-    n_candidates_2026: upcoming?.ballot.length ?? null,
+    n_candidates_2026: contest2026?.ballot.length ?? null,
     voters_total: current?.voters_total ?? null,
     youth_perc: youth,
     income_median: socio.get(seat.code)?.income?.at(-1)?.income_median ?? null,
     income_year: socio.get(seat.code)?.income?.at(-1)?.date?.slice(0, 4) ?? null,
     u_rate: socio.get(seat.code)?.labour?.at(-1)?.u_rate ?? null,
-    last_result: last ? {
-      date: last.date, election: last.election,
-      winner: last.ballot[0]?.name ?? null,
-      party: last.ballot[0]?.party ?? null,
-      coalition: last.ballot[0]?.coalition ?? null,
-      majority_perc: last.majority_perc ?? null,
-      turnout_perc: last.voter_turnout_perc ?? null,
-    } : null,
+    last_result: last ? (() => {
+      // winner by result string when available, vote order as fallback
+      const w = last.ballot.find(b => (b.result ?? '').startsWith('won')) ?? last.ballot[0] ?? null
+      return {
+        date: last.date, election: last.election,
+        winner: w?.name ?? null,
+        party: w?.party ?? null,
+        coalition: w?.coalition ?? null,
+        majority_perc: last.majority_perc ?? null,
+        turnout_perc: last.voter_turnout_perc ?? null,
+      }
+    })() : null,
   })
 }
 

@@ -453,18 +453,23 @@ async function renderHome() {
 // ---- seat tabs ----
 function contestCard(seat) {
   const e = seat.election2026
-  // once results are in, the pending ballot disappears and the contest tops history
-  const done = seat.history?.[0]
-  const resultsIn = !e?.ballot && done && done.date === e?.polling_date
+  // the pipeline sets result_date once the 2026 contest has settled into
+  // history — trust that flag rather than re-deriving it by date comparison
+  const resultsIn = !e?.ballot && !!e?.result_date
   if (!e?.ballot && !resultsIn) return ''
-  const ballot = e?.ballot ?? done.ballot
+  // the settled 2026 contest, matched by the pipeline's result_date so a later
+  // by-election in the seat is never rendered here
+  const done = resultsIn ? (seat.history?.find(c => c.date === e.result_date) ?? seat.history?.[0]) : null
+  const ballot = e?.ballot ?? done?.ballot ?? []
   return `<div class="card">
     <h2>${resultsIn ? L('results_2026') : L('contest_2026')}</h2>
-    <p class="sub">${resultsIn ? L('results_sub') : L('contest_sub')} · ${fmtNum(resultsIn ? done.voters_total : e.voters_total)} ${L('voters')}</p>
+    <p class="sub">${resultsIn ? L('results_sub') : L('contest_sub')} · ${fmtNum(resultsIn ? done?.voters_total : e.voters_total)} ${L('voters')}</p>
     <table class="data"><tbody>
       ${ballot.map(b => {
         const isBloc = b.party === 'MUDA' || b.party === 'PSM'
-        const won = b.result === 'won' || b.result === 'won_uncontested'
+        // winner markup only once results are actually in — during a partial
+        // count the pending-style list must not show a premature checkmark
+        const won = resultsIn && (b.result ?? '').startsWith('won')
         const career = !resultsIn ? (b.career
           ? L('career_line', b.career.contested, b.career.won, `${b.career.last.election} ${b.career.last.seat}`, b.career.last.date.slice(0, 4))
           : L('first_time')) : null
@@ -591,7 +596,7 @@ function shareText(seat) {
   }).filter(x => x.ws).sort((a, b) => b.ws.perc - a.ws.perc)[0]
   const lines = [
     `📍 ${seat.code} ${seat.name} — PRN Johor ${e.polling_date === '2026-07-11' ? '11 Julai 2026' : e.polling_date}`,
-    e.muda_candidate ? `★ ${L('bloc_candidate')}: ${e.muda_candidate} (${e.bloc_party})` : null,
+    e.muda_candidate ? `★ ${L('bloc_candidate')}: ${e.muda_candidate}${e.bloc_party ? ` (${e.bloc_party})` : ''}` : null,
     worst ? `🧺 ${worst.it.label_bm}: ${fmtRM(worst.ws.last)} (${worst.ws.perc > 0 ? '+' : ''}${worst.ws.perc}% / 3 bln)` : null,
     inc ? `💰 ${L('income_median')}: RM${fmtNum(inc.income_median)}` : null,
     `Data terbuka rasmi · ${location.origin}${location.pathname}#/seat/${seat.slug}`,
@@ -688,7 +693,7 @@ function storyFor(seat, bench, idx) {
 
   // 1 — path to victory (the turnout math)
   if (last) {
-    const w = last.ballot[0]
+    const w = last.ballot.find(b => (b.result ?? '').startsWith('won')) ?? last.ballot[0]
     const t = last.voter_turnout_perc
     const tp = prev?.voter_turnout_perc
     const turnoutCollapsed = t != null && tp != null && tp - t > 10
@@ -865,13 +870,16 @@ function renderHq(seat) {
     <h2>${L('history')}</h2>
     <table class="data">
       <thead><tr><th>${L('election')}</th><th>${L('winner')}</th><th class="num">${L('majority')}</th><th class="num">${L('turnout')}</th></tr></thead>
-      <tbody>${hist.map(c => `
+      <tbody>${hist.map(c => {
+        const w = c.ballot.find(b => (b.result ?? '').startsWith('won')) ?? c.ballot[0]
+        return `
         <tr>
           <td>${esc(c.election)}<br><span style="color:var(--muted);font-size:.72rem">${esc(c.date)} · ${esc(c.code_then)}</span></td>
-          <td>${esc(c.ballot[0]?.name ?? '')}<br>${partyBadge(c.ballot[0]?.party ?? '?', c.ballot[0]?.coalition)}</td>
+          <td>${esc(w?.name ?? '')}<br>${partyBadge(w?.party ?? '?', w?.coalition)}</td>
           <td class="num">${fmtPct(c.majority_perc)}</td>
           <td class="num">${fmtPct(c.voter_turnout_perc)}</td>
-        </tr>`).join('')}
+        </tr>`
+      }).join('')}
       </tbody></table>
   </div>`
 

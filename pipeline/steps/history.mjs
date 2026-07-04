@@ -42,6 +42,19 @@ export async function loadHistory(seats) {
   // attach stats + index by seat name
   const bySeatName = new Map()
   for (const c of contests.values()) {
+    // count-week lake updates may append resulted rows next to stale pending
+    // ones; keep one row per candidate, preferring the settled/latest row
+    const byCand = new Map()
+    for (const b of c.ballot) {
+      const k = b.uid || b.name
+      const prev = byCand.get(k)
+      if (!prev
+        || (prev.result === 'pending' && b.result !== 'pending')
+        || (prev.result !== 'pending' && b.result !== 'pending' && (b.votes ?? 0) > (prev.votes ?? 0))) {
+        byCand.set(k, b)
+      }
+    }
+    c.ballot = [...byCand.values()]
     c.ballot.sort((a, b) => (b.votes ?? 0) - (a.votes ?? 0))
     const s = statByContest.get(`${c.date}|${c.seat}`)
     if (s) {
@@ -60,13 +73,23 @@ export async function loadHistory(seats) {
 
   const out = new Map()
   for (const seat of seats) {
-    const list = (bySeatName.get(seat.name) ?? []).map(c => ({
-      ...c,
-      // nomination lineups for future polling days ship with result='pending'
-      status: c.ballot.some(b => b.result === 'pending') ? 'upcoming' : 'completed',
-      code_then: seatCode(c.seat),
-      seat: undefined,
-    }))
+    const list = (bySeatName.get(seat.name) ?? []).map(c => {
+      // nomination lineups for future polling days ship with result='pending'.
+      // A contest only counts as completed once its results look complete:
+      // no pending/blank rows AND real vote counts — otherwise a mid-count
+      // lake state (result strings blanked or flipped before totals arrive)
+      // would be published as an official result. Single-candidate walkovers
+      // are the one legitimate zero-vote completed contest (23 in the lake).
+      const unsettled = c.ballot.some(b => b.result === 'pending' || !b.result)
+      const totalVotes = c.ballot.reduce((a, b) => a + (b.votes ?? 0), 0)
+      const walkover = c.ballot.length === 1 && (c.ballot[0].result ?? '').startsWith('won')
+      return {
+        ...c,
+        status: unsettled || (totalVotes === 0 && !walkover) ? 'upcoming' : 'completed',
+        code_then: seatCode(c.seat),
+        seat: undefined,
+      }
+    })
     out.set(seat.code, list)
   }
   return out
