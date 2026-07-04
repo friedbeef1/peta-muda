@@ -41,7 +41,8 @@
       "Bash(curl -s -m 30 -w \"\\\\nHTTP %{http_code} | %{content_type}\\\\n\" \"https://pasarapi.xyz/mcp\")",
       "Bash(curl -sS -w \"HTTP:%{http_code}\\\\n\" \"https://api.github.com/repos/data-gov-my/datagovmy-meta\" -H \"User-Agent: research\")",
       "WebFetch(domain:fulcrum.sg)",
-      "Bash(curl -sS \"https://api.github.com/repos/data-gov-my/datagovmy-meta/contents/\" -H \"User-Agent: research\")"
+      "Bash(curl -sS \"https://api.github.com/repos/data-gov-my/datagovmy-meta/contents/\" -H \"User-Agent: research\")",
+      "mcp__Claude_Code_Remote__send_later"
     ]
   }
 }
