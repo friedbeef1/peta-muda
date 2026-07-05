@@ -1462,11 +1462,16 @@ function renderHq(seat) {
       <thead><tr><th>${L('election')}</th><th>${L('winner')}</th><th class="num">${L('majority')}</th><th class="num">${L('turnout')}</th></tr></thead>
       <tbody>${hist.map(c => {
         const w = c.ballot.find(b => (b.result ?? '').startsWith('won')) ?? c.ballot[0]
+        // "majority" in Malaysian usage = the absolute winning margin in votes;
+        // show that as primary with the margin-% secondary (7,114 (13%))
+        const majCell = c.majority != null
+          ? `${fmtNum(c.majority)}${c.majority_perc != null ? ` <span style="color:var(--muted)">(${fmtPct(c.majority_perc, 0)})</span>` : ''}`
+          : fmtPct(c.majority_perc)
         return `
         <tr>
           <td>${esc(c.election)}<br><span style="color:var(--muted);font-size:.72rem">${esc(c.date)} · ${esc(c.code_then)}</span></td>
           <td>${esc(w?.name ?? '')}<br>${partyBadge(w?.party ?? '?', w?.coalition)}</td>
-          <td class="num">${fmtPct(c.majority_perc)}</td>
+          <td class="num">${majCell}</td>
           <td class="num">${fmtPct(c.voter_turnout_perc)}</td>
         </tr>`
       }).join('')}
