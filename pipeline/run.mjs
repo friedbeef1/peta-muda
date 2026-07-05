@@ -169,10 +169,20 @@ const priceBlockFor = (seat) => {
     // government price ceiling, for the 3 items that currently have one —
     // compliance is checked against whichever scope the current price uses
     // (district median where available, else Johor), so it compares like
-    // with like rather than mixing a district figure against a Johor ceiling
+    // with like rather than mixing a district figure against a Johor ceiling.
+    // Ceilings are per-kg but the picked SKU may be a multi-kg pack (live
+    // KPDN rice is a 10kg bag: RM26/10kg = RM2.60/kg, exactly at ceiling —
+    // comparing the raw pack price would scream "+900% over"), so the
+    // observed price is normalized to the ceiling's kg unit first; if the
+    // pack unit isn't expressible in kg, no comparison is made at all.
     const ceil = priceCeilings.items?.[b.key] ?? null
-    const observed = latest ?? latestJohor
-    const ceiling = ceil ? { ...ceil, observed, exceeds_perc: observed != null ? +(100 * (observed - ceil.price) / ceil.price).toFixed(1) : null } : null
+    const observedRaw = latest ?? latestJohor
+    const kgMatch = ceil && typeof b.unit === 'string' ? b.unit.match(/^(\d+(?:\.\d+)?)\s*kg$/i) : null
+    const kgFactor = kgMatch ? parseFloat(kgMatch[1]) : null
+    const observed = observedRaw != null && kgFactor ? +(observedRaw / kgFactor).toFixed(2) : null
+    const ceiling = ceil && kgFactor
+      ? { ...ceil, observed, observed_pack: observedRaw, pack_unit: b.unit, exceeds_perc: observed != null ? +(100 * (observed - ceil.price) / ceil.price).toFixed(1) : null }
+      : null
     return {
       code: b.code, key: b.key, label_bm: b.label_bm, label_en: b.label_en, item: b.item, unit: b.unit,
       latest_district: latest,

@@ -344,7 +344,9 @@ export async function buildFixtures(scenario, outDir, dataDir = 'site/data') {
       ...index.basket.map(b => ({
         item_code: b.code, item: b.item, unit: b.unit, item_group: 'BARANGAN SEGAR', item_category: 'sim',
       })),
-      { item_code: SYN_BERAS_TEMPATAN, item: 'BERAS SUPER TEMPATAN (SST)', unit: '1KG', item_group: 'BARANGAN SEGAR', item_category: 'sim' },
+      // 10KG pack on purpose — the live KPDN pick is a 10kg bag (RM26/10kg =
+      // RM2.60/kg), regression-testing the per-kg ceiling normalization
+      { item_code: SYN_BERAS_TEMPATAN, item: 'BERAS SUPER TEMPATAN (SST)', unit: '10KG', item_group: 'BARANGAN SEGAR', item_category: 'sim' },
       { item_code: SYN_BAWANG_PUTIH, item: 'BAWANG PUTIH IMPORT (CHINA)', unit: '1KG', item_group: 'BARANGAN SEGAR', item_category: 'sim' },
     ]
     await put(SOURCES.lookupItem, 'lookup_item.csv',
@@ -394,11 +396,11 @@ export async function buildFixtures(scenario, outDir, dataDir = 'site/data') {
     const allPremises = [...districts.map(d => premByDistrict[d]), 90100]
     for (const w of weeks) {
       for (const prem of allPremises) {
-        obs(w, prem, SYN_BERAS_TEMPATAN, 2.60)
+        obs(w, prem, SYN_BERAS_TEMPATAN, 26.00)
         obs(w, prem, SYN_BAWANG_PUTIH, 9.50)
       }
     }
-    obs(index.price_max_date, 90100, SYN_BERAS_TEMPATAN, 2.60)
+    obs(index.price_max_date, 90100, SYN_BERAS_TEMPATAN, 26.00)
     obs(index.price_max_date, 90100, SYN_BAWANG_PUTIH, 9.50)
     // anchor month (previous election): >=15 obs per item at the committed
     // Johor anchor value so the "since SE-15" comparison materializes
