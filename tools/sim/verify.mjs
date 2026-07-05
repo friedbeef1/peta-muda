@@ -117,6 +117,16 @@ export async function verifyScenario(scenario, simDataDir, committedDataDir) {
       ok(sim.index.muda_record == null, 'neutral edition must omit muda_record')
       ok(jc.muda == null, 'neutral edition must omit johor_context.muda')
     }
+    // ceiling compliance must be per-kg normalized: the synthetic rice is a
+    // 10KG pack at RM26.00, so observed must read RM2.60 (exactly at ceiling),
+    // never the raw pack price (which would scream +900%)
+    for (const code of codes) {
+      const beras = sim.seats[code].prices?.items?.find(i => i.key === 'beras')
+      if (beras?.ceiling && beras.ceiling.observed != null) {
+        ok(Math.abs(beras.ceiling.observed - 2.6) < 0.01, `${code}: beras ceiling.observed ${beras.ceiling.observed} != per-kg 2.60`)
+        ok(Math.abs(beras.ceiling.exceeds_perc) < 1, `${code}: beras exceeds_perc ${beras.ceiling.exceeds_perc} not ~0 after kg normalization`)
+      }
+    }
     // national issues: neutral metadata, both editions — every entry themed,
     // bilingual and sourced; in the muda build every theme must resolve to a
     // stance so the doorstep beat can always overlay a MUDA angle
