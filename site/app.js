@@ -58,6 +58,15 @@ const STR = {
     brief_btn: '🤖 Briefing AI (untuk ChatGPT/Gemini)',
     brief_saved: 'Fail .md dimuat turun!',
     stances_sub: 'Pendirian bersumber — sahkan sebelum menerbitkan bahan kempen',
+    ceiling_title: 'Pematuhan harga siling kerajaan',
+    ceiling_sub: 'Harga sebenar berbanding harga siling rasmi bagi 3 barangan terkawal',
+    ceiling_observed: 'Harga tempatan',
+    ceiling_official: 'Siling rasmi',
+    ceiling_status: 'Status',
+    ceiling_ok: 'Dalam siling',
+    ceiling_no_data: 'Tiada data',
+    ceiling_exceeds: (p) => `+${p}% melebihi`,
+    ceiling_note: 'Harga siling ditetapkan kerajaan (bukan data KPDN PriceCatcher) — disahkan secara manual, sahkan sebelum menerbitkan.',
     crime_title: 'Jenayah di Johor',
     crime_sub: 'Jenayah indeks berdaftar mengikut daerah polis',
     crime_note: 'Data PDRM peringkat daerah polis (bukan kerusi). Sahkan sebelum menerbitkan.',
@@ -175,6 +184,15 @@ const STR = {
     brief_btn: '🤖 AI briefing (for ChatGPT/Gemini)',
     brief_saved: '.md file downloaded!',
     stances_sub: 'Sourced positions — verify before publishing campaign material',
+    ceiling_title: 'Government price-ceiling compliance',
+    ceiling_sub: 'Local observed price vs. the official ceiling for the 3 controlled items',
+    ceiling_observed: 'Local price',
+    ceiling_official: 'Official ceiling',
+    ceiling_status: 'Status',
+    ceiling_ok: 'Within ceiling',
+    ceiling_no_data: 'No data',
+    ceiling_exceeds: (p) => `+${p}% over`,
+    ceiling_note: 'Ceiling prices are government-set (not KPDN PriceCatcher data) — manually verified, verify before publishing.',
     crime_title: 'Crime in Johor',
     crime_sub: 'Registered index crime by police district',
     crime_note: 'PDRM data at police-district level (not per seat). Verify before publishing.',
@@ -818,6 +836,41 @@ function pricesCard(seat, compact = true) {
   </div>`
 }
 
+// ---- government price-ceiling compliance (3 items: chicken/oil/rice) ----
+function ceilingCard(seat) {
+  const items = (seat.prices?.items ?? []).filter(i => i.ceiling)
+  if (!items.length) return ''
+  const bm = state.lang === 'bm'
+  const rows = items.map(it => {
+    const c = it.ceiling
+    const label = bm ? (c.label_bm ?? it.label_bm) : (c.label_en ?? it.label_en)
+    const exceeds = c.exceeds_perc != null && c.exceeds_perc > 0.5
+    const badge = c.observed == null
+      ? `<span class="delta-flat">${L('ceiling_no_data')}</span>`
+      : exceeds
+        ? `<span class="delta-up">${L('ceiling_exceeds', c.exceeds_perc.toFixed(1))}</span>`
+        : `<span class="delta-down">${L('ceiling_ok')}</span>`
+    return `<tr>
+      <td><strong>${esc(state.lang === 'bm' ? it.label_bm : it.label_en)}</strong><br><span style="color:var(--muted);font-size:.72rem">${esc(label)}</span></td>
+      <td class="num">${c.observed != null ? fmtRM(c.observed) : '–'}</td>
+      <td class="num">${fmtRM(c.price)}</td>
+      <td>${badge}</td>
+    </tr>`
+  }).join('')
+  const anySourced = items.some(it => it.ceiling.source)
+  const refs = items.filter(it => it.ceiling.source)
+    .map((it, i) => `<a href="${esc(it.ceiling.source)}" target="_blank" rel="noopener" style="color:var(--muted)">[${i + 1}]</a>`).join(' ')
+  return `<div class="card">
+    <h2>${L('ceiling_title')}</h2>
+    <p class="sub">${L('ceiling_sub')}</p>
+    <table class="data">
+      <thead><tr><th>${L('col_item')}</th><th class="num">${L('ceiling_observed')}</th><th class="num">${L('ceiling_official')}</th><th>${L('ceiling_status')}</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+    <div class="notice">${L('ceiling_note')}${anySourced ? ` ${refs}` : ''}</div>
+  </div>`
+}
+
 function incomeCard(seat, bench) {
   const inc = seat.socio.income?.at(-1)
   const pov = seat.socio.poverty?.at(-1)
@@ -903,6 +956,7 @@ function renderBrief(seat, bench, idx) {
   return `
     ${contestCard(seat)}
     ${pricesCard(seat)}
+    ${ceilingCard(seat)}
     ${raceCard(seat, idx)}
     ${incomeCard(seat, bench)}
     <div class="btn-row">

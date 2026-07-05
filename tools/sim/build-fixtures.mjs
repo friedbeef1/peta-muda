@@ -331,9 +331,22 @@ export async function buildFixtures(scenario, outDir, dataDir = 'site/data') {
 
   // --- PriceCatcher: lookups + monthly parquets covering the app's window ---
   {
-    const items = index.basket.map(b => ({
-      item_code: b.code, item: b.item, unit: b.unit, item_group: 'BARANGAN SEGAR', item_category: 'sim',
-    }))
+    // Committed index.basket predates the rice-picker fix (its 'beras' item
+    // is the now-excluded imported SKU) and the new garlic category, so
+    // neither has real committed data to derive fixture prices from. Inject
+    // two synthetic items — a genuinely local/tempatan rice and a garlic
+    // entry — with distinct codes, so the sim actually exercises both new
+    // code paths (ceiling-eligible local rice pick; garlic basket pick)
+    // instead of silently dropping them for lack of fixture coverage.
+    const SYN_BERAS_TEMPATAN = 77001
+    const SYN_BAWANG_PUTIH = 77002
+    const items = [
+      ...index.basket.map(b => ({
+        item_code: b.code, item: b.item, unit: b.unit, item_group: 'BARANGAN SEGAR', item_category: 'sim',
+      })),
+      { item_code: SYN_BERAS_TEMPATAN, item: 'BERAS SUPER TEMPATAN (SST)', unit: '1KG', item_group: 'BARANGAN SEGAR', item_category: 'sim' },
+      { item_code: SYN_BAWANG_PUTIH, item: 'BAWANG PUTIH IMPORT (CHINA)', unit: '1KG', item_group: 'BARANGAN SEGAR', item_category: 'sim' },
+    ]
     await put(SOURCES.lookupItem, 'lookup_item.csv',
       toCsv(['item_code', 'item', 'unit', 'item_group', 'item_category'], items))
 
@@ -375,6 +388,18 @@ export async function buildFixtures(scenario, outDir, dataDir = 'site/data') {
       const lastWeek = [...weeks].reverse().find(w => johorSeries[w] != null)
       if (lastWeek != null) obs(index.price_max_date, 90100, b.code, johorSeries[lastWeek])
     }
+    // synthetic local-rice + garlic observations: every district premise plus
+    // the JB hypermarket (10 premises total) at every week, so both clear the
+    // >=10-premise coverage threshold the basket picker requires
+    const allPremises = [...districts.map(d => premByDistrict[d]), 90100]
+    for (const w of weeks) {
+      for (const prem of allPremises) {
+        obs(w, prem, SYN_BERAS_TEMPATAN, 2.60)
+        obs(w, prem, SYN_BAWANG_PUTIH, 9.50)
+      }
+    }
+    obs(index.price_max_date, 90100, SYN_BERAS_TEMPATAN, 2.60)
+    obs(index.price_max_date, 90100, SYN_BAWANG_PUTIH, 9.50)
     // anchor month (previous election): >=15 obs per item at the committed
     // Johor anchor value so the "since SE-15" comparison materializes
     for (const it of index.basket_since_se15?.items ?? []) {
