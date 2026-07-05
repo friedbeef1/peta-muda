@@ -54,6 +54,9 @@ const STR = {
     muda_title: 'MUDA — parti kecil, kesan besar',
     muda_record_title: 'Rekod kebangsaan (bersumber)',
     muda_seat_title: 'Kesan MUDA di kerusi ini',
+    crime_title: 'Jenayah di Johor',
+    crime_sub: 'Jenayah indeks berdaftar mengikut daerah polis',
+    crime_note: 'Data PDRM peringkat daerah polis (bukan kerusi). Sahkan sebelum menerbitkan.',
     race_title: 'Harga vs pendapatan vs inflasi rasmi',
     race_sub: 'Kadar perubahan setahun — harga dapur diukur sejak PRN lalu (Mac 2022)',
     basket_rate: 'Bakul dapur',
@@ -164,6 +167,9 @@ const STR = {
     muda_title: 'MUDA — small party, big bite',
     muda_record_title: 'National record (sourced)',
     muda_seat_title: "MUDA's footprint in this seat",
+    crime_title: 'Crime in Johor',
+    crime_sub: 'Registered index crime by police district',
+    crime_note: 'PDRM data at police-district level (not per seat). Verify before publishing.',
     race_title: 'Prices vs income vs official inflation',
     race_sub: 'Annual rates of change — kitchen prices measured since the last election (Mar 2022)',
     basket_rate: 'Kitchen basket',
@@ -453,6 +459,47 @@ function mudaSeatCard(seat, idx) {
 }
 
 
+// ---- Johor crime context (johor_context.crime; neutral, both editions) ----
+const CRIME_TYPE_LABELS = {
+  causing_injury: { bm: 'Mencederakan', en: 'Causing injury' },
+  murder: { bm: 'Bunuh', en: 'Murder' },
+  rape: { bm: 'Rogol', en: 'Rape' },
+  robbery_gang_armed: { bm: 'Rompakan berkumpulan (bersenjata)', en: 'Gang robbery (armed)' },
+  robbery_gang_unarmed: { bm: 'Rompakan berkumpulan', en: 'Gang robbery' },
+  robbery_solo_armed: { bm: 'Rompakan (bersenjata)', en: 'Robbery (armed)' },
+  robbery_solo_unarmed: { bm: 'Rompakan', en: 'Robbery' },
+  break_in: { bm: 'Pecah rumah', en: 'Break-in' },
+  theft_other: { bm: 'Curi lain-lain', en: 'Other theft' },
+  theft_vehicle_lorry: { bm: 'Curi lori', en: 'Lorry theft' },
+  theft_vehicle_motorcar: { bm: 'Curi kereta', en: 'Car theft' },
+  theft_vehicle_motorcycle: { bm: 'Curi motosikal', en: 'Motorcycle theft' },
+}
+const crimeLabel = (t) => {
+  const l = CRIME_TYPE_LABELS[t]
+  return l ? (state.lang === 'bm' ? l.bm : l.en) : String(t).replace(/_/g, ' ')
+}
+
+function crimeCard(idx) {
+  const c = idx.johor_context?.crime
+  if (!c || !c.total_latest) return ''
+  const bm = state.lang === 'bm'
+  const types = (c.by_type_latest ?? []).slice(0, 6)
+  const maxT = Math.max(...types.map(t => t.value), 1)
+  const dists = (c.by_district_latest ?? []).slice(0, 6)
+  const maxD = Math.max(...dists.map(d => d.value), 1)
+  return `<div class="card">
+    <h2>${L('crime_title')}</h2>
+    <p class="sub">${L('crime_sub')} · ${esc(String(c.latest_year))}${c.source ? ` · ${esc(c.source)}` : ''}</p>
+    <div style="margin:.3rem 0 .5rem"><span style="font-size:1.6rem;font-weight:800">${fmtNum(c.total_latest)}</span>
+      <span style="color:var(--muted)"> ${bm ? 'jenayah indeks dilaporkan' : 'index crimes reported'} ${esc(String(c.latest_year))}${c.change_yoy_perc != null ? ` · ${deltaHtml(c.change_yoy_perc)} ${bm ? 'vs tahun sebelum' : 'vs prior year'}` : ''}</span></div>
+    <h3>${bm ? 'Jenis teratas' : 'Top crime types'}</h3>
+    ${types.map(t => barRow(crimeLabel(t.type), 100 * t.value / maxT, fmtNum(t.value))).join('')}
+    <h3>${bm ? 'Daerah polis teratas' : 'Top police districts'}</h3>
+    ${dists.map(d => barRow(esc(d.district), 100 * d.value / maxD, fmtNum(d.value))).join('')}
+    <div class="notice" style="font-size:.72rem;margin-top:.5rem">${L('crime_note')}</div>
+  </div>`
+}
+
 async function renderHome() {
   const idx = await loadIndex()
   const featured = idx.seats.filter(s => s.featured)
@@ -495,6 +542,8 @@ async function renderHome() {
         <span class="chip">Diesel ${fmtRM(fuel.diesel)}</span>
       </div>` : ''}
     </div>
+
+    ${crimeCard(idx)}
 
     <div class="card">
       <h2>${L('all_seats')}</h2>

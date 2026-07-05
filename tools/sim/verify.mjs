@@ -88,6 +88,13 @@ export async function verifyScenario(scenario, simDataDir, committedDataDir) {
   // ---- MUDA edition gating + Undi18 rollup consistency (all scenarios) ----
   {
     const jc = sim.index.johor_context ?? {}
+    // crime: Johor context present with sane shape (fixtured from the real schema)
+    ok(jc.crime?.total_latest > 0, 'johor_context.crime missing/zero')
+    ok(jc.crime?.latest_year === '2023', `crime latest_year expected 2023, got ${jc.crime?.latest_year}`)
+    ok((jc.crime?.by_type_latest?.length ?? 0) > 0, 'crime by_type_latest empty')
+    ok((jc.crime?.by_district_latest?.length ?? 0) > 0, 'crime by_district_latest empty')
+    ok(!(jc.crime?.by_district_latest ?? []).some(d => d.district === 'All'), 'crime must exclude the All rollup district')
+    ok(!(jc.crime?.by_type_latest ?? []).some(t => t.type === 'all'), 'crime must exclude the all rollup type')
     ok(jc.undi18?.total_18_20 > 0, 'undi18 rollup missing/zero')
     let sum1820 = 0
     for (const code of codes) {

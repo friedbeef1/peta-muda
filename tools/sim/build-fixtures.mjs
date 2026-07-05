@@ -401,6 +401,48 @@ export async function buildFixtures(scenario, outDir, dataDir = 'site/data') {
     }
   }
 
+
+  // --- crime_district.parquet (schema from the real runner probe: state,
+  // district, category, type, date, crimes[INT64]; rollup rows district 'All'
+  // and type 'all' present and excluded downstream). Deterministic, no RNG. ---
+  {
+    const districts = ['Batu Pahat', 'Iskandar Puteri', 'Johor Bahru Selatan', 'Johor Bahru Utara', 'Kluang', 'Kota Tinggi', 'Kulaijaya', 'Ledang', 'Mersing', 'Muar', 'Nusajaya', 'Pontian', 'Segamat', 'Seri Alam']
+    const cats = { assault: ['causing_injury', 'murder', 'rape', 'robbery_gang_armed', 'robbery_gang_unarmed', 'robbery_solo_armed', 'robbery_solo_unarmed'], property: ['break_in', 'theft_other', 'theft_vehicle_lorry', 'theft_vehicle_motorcar', 'theft_vehicle_motorcycle'] }
+    const years = [2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023]
+    const h = (s) => { let x = 2166136261; for (const c of s) { x ^= c.charCodeAt(0); x = Math.imul(x, 16777619) } return (x >>> 0) % 1000 }
+    const baseOf = (t) => t.startsWith('theft') ? 180 : t === 'murder' ? 3 : t === 'rape' ? 14 : t.startsWith('robbery') ? 28 : 55
+    const rows = []
+    const push = (district, category, type, year, crimes) => rows.push({ state: 'Johor', district, category, type, date: `${year}-01-01`, crimes })
+    for (const year of years) {
+      const stateTotals = {}
+      for (const d of districts) {
+        for (const [cat, types] of Object.entries(cats)) {
+          let catTotal = 0
+          for (const t of types) {
+            const v = Math.max(0, baseOf(t) + (h(`${d}${t}${year}`) % baseOf(t)) - (year - 2016) * 6) // gentle downtrend
+            catTotal += v
+            push(d, cat, t, year, v)
+            stateTotals[`${cat}|${t}`] = (stateTotals[`${cat}|${t}`] ?? 0) + v
+          }
+          push(d, cat, 'all', year, catTotal) // per-district rollup row (excluded downstream)
+        }
+      }
+      // 'All' district state-total rollup rows (also excluded downstream)
+      for (const [k, v] of Object.entries(stateTotals)) push('All', k.split('|')[0], k.split('|')[1], year, v)
+    }
+    const buf = parquetWriteBuffer({
+      columnData: [
+        { name: 'state', data: rows.map(r => r.state), type: 'STRING' },
+        { name: 'district', data: rows.map(r => r.district), type: 'STRING' },
+        { name: 'category', data: rows.map(r => r.category), type: 'STRING' },
+        { name: 'type', data: rows.map(r => r.type), type: 'STRING' },
+        { name: 'date', data: rows.map(r => r.date), type: 'STRING' },
+        { name: 'crimes', data: rows.map(r => BigInt(r.crimes)), type: 'INT64' },
+      ],
+    })
+    await put(SOURCES.crimeDistrict, 'crime_district.parquet', Buffer.from(buf))
+  }
+
   await writeFile(path.join(outDir, 'manifest.json'), JSON.stringify(manifest, null, 1))
   return { urls: Object.keys(manifest).length }
 }
