@@ -51,6 +51,14 @@ const STR = {
     record_hop: (n) => `Bertukar parti ${n} kali`,
     record_switchedin: (p) => `Bertanding atas tiket ${p} buat kali pertama tahun ini`,
     record_now: 'kini',
+    muda_title: 'MUDA — parti kecil, kesan besar',
+    muda_record_title: 'Rekod kebangsaan (bersumber)',
+    muda_seat_title: 'Kesan MUDA di kerusi ini',
+    stances_title: 'Jawapan MUDA untuk isu tempatan',
+    stances_sub: 'Pendirian bersumber — sahkan sebelum menerbitkan bahan kempen',
+    crime_title: 'Jenayah di Johor',
+    crime_sub: 'Jenayah indeks berdaftar mengikut daerah polis',
+    crime_note: 'Data PDRM peringkat daerah polis (bukan kerusi). Sahkan sebelum menerbitkan.',
     race_title: 'Harga vs pendapatan vs inflasi rasmi',
     race_sub: 'Kadar perubahan setahun — harga dapur diukur sejak PRN lalu (Mac 2022)',
     basket_rate: 'Bakul dapur',
@@ -158,6 +166,14 @@ const STR = {
     record_hop: (n) => `Switched party ${n} times`,
     record_switchedin: (p) => `Standing on the ${p} ticket for the first time this year`,
     record_now: 'now',
+    muda_title: 'MUDA — small party, big bite',
+    muda_record_title: 'National record (sourced)',
+    muda_seat_title: "MUDA's footprint in this seat",
+    stances_title: "MUDA's answer to the local issues",
+    stances_sub: 'Sourced positions — verify before publishing campaign material',
+    crime_title: 'Crime in Johor',
+    crime_sub: 'Registered index crime by police district',
+    crime_note: 'PDRM data at police-district level (not per seat). Verify before publishing.',
     race_title: 'Prices vs income vs official inflation',
     race_sub: 'Annual rates of change — kitchen prices measured since the last election (Mar 2022)',
     basket_rate: 'Kitchen basket',
@@ -397,6 +413,128 @@ function countdownCard(idx) {
   return `<div class="card"><div class="countdown">${inner}</div></div>`
 }
 
+// ---- pro-MUDA edition (EDITION=muda) advocacy layer, gated on idx.edition ----
+function mudaRecordList(rec) {
+  const bm = state.lang === 'bm'
+  return (rec?.national ?? []).map(it => {
+    const claim = bm ? (it.claim_bm ?? it.claim_en) : (it.claim_en ?? it.claim_bm)
+    const receipt = bm ? (it.receipt_bm ?? it.receipt_en) : (it.receipt_en ?? it.receipt_bm)
+    const refs = (it.sources ?? []).map((u, i) =>
+      ` <a href="${esc(u)}" target="_blank" rel="noopener" style="color:var(--muted)">[${i + 1}]</a>`).join('')
+    const v = it.verdict ? `<span class="badge" style="background:var(--lain);font-size:.62rem">${esc(it.verdict)}</span> ` : ''
+    return `<li>${v}<strong>${esc(claim ?? '')}</strong>${receipt ? `<br><span style="color:var(--muted);font-size:.78rem">${esc(receipt)}</span>` : ''}${refs}</li>`
+  }).join('')
+}
+
+function mudaHomeCard(idx) {
+  if (idx.edition !== 'muda') return ''
+  const bm = state.lang === 'bm'
+  const u = idx.johor_context?.undi18
+  const m = idx.johor_context?.muda
+  const rec = idx.muda_record
+  const headline = rec ? (bm ? rec.headline_bm : rec.headline_en) : L('muda_title')
+  const sub = rec ? (bm ? rec.sub_bm : rec.sub_en) : ''
+  const stats = []
+  if (u) stats.push(`<div style="min-width:130px"><div style="font-size:1.7rem;font-weight:800;color:var(--accent)">${fmtNum(u.total_18_20)}</div><div style="color:var(--muted);font-size:.72rem">${bm ? 'pengundi 18–20 tahun di daftar Johor 2026 — kohort yang dibuka oleh reformasi Undi18 2019' : "voters aged 18–20 on Johor's 2026 roll — the cohort the 2019 Undi18 reform opened up"}</div></div>`)
+  if (m) stats.push(`<div style="min-width:130px"><div style="font-size:1.7rem;font-weight:800;color:var(--accent)">${m.won}/${m.seats_contested}</div><div style="color:var(--muted);font-size:.72rem">${bm ? `kerusi Johor dimenangi MUDA pada 2022 (purata ${m.avg_perc}% undi)` : `Johor seats MUDA won in 2022 (avg ${m.avg_perc}% of the vote)`}</div></div>`)
+  return `<div class="card" style="border:2px solid var(--accent)">
+    <h2>${esc(headline)}</h2>
+    ${sub ? `<p class="sub">${esc(sub)}</p>` : ''}
+    ${stats.length ? `<div style="display:flex;gap:1.2rem;flex-wrap:wrap;margin:.6rem 0 .2rem">${stats.join('')}</div>` : ''}
+    ${rec ? `<h3>${L('muda_record_title')}</h3><ul class="points">${mudaRecordList(rec)}</ul>` : ''}
+  </div>`
+}
+
+// ---- MUDA's answer to this seat's doorstep issues (muda edition only —
+// neutral builds never carry seat.muda_stances, so presence is the gate) ----
+function mudaStancesCard(seat) {
+  const themes = seat.muda_stances
+  if (!themes?.length) return ''
+  const bm = state.lang === 'bm'
+  const items = themes.map(t => {
+    const label = bm ? (t.label_bm ?? t.label_en) : (t.label_en ?? t.label_bm)
+    const stance = bm ? (t.stance_bm ?? t.stance_en) : (t.stance_en ?? t.stance_bm)
+    const refs = (t.sources ?? []).map((u, i) =>
+      ` <a href="${esc(u)}" target="_blank" rel="noopener" style="color:var(--muted)">[${i + 1}]</a>`).join('')
+    const quotes = (t.quotes ?? []).map(q => {
+      const role = bm ? (q.role_bm ?? q.role_en) : (q.role_en ?? q.role_bm)
+      return `<blockquote style="margin:.45rem 0 0;padding:.4rem .6rem;border-left:3px solid var(--accent);background:var(--bg2,rgba(0,0,0,.03));font-size:.8rem">
+        “${esc(q.text)}”
+        <br><span style="color:var(--muted);font-size:.72rem">— ${esc(q.who)}${role ? `, ${esc(role)}` : ''}${q.date ? ` (${esc(q.date.slice(0, 7))})` : ''}${q.source ? ` <a href="${esc(q.source)}" target="_blank" rel="noopener" style="color:var(--muted)">[sumber]</a>` : ''}</span>
+      </blockquote>`
+    }).join('')
+    return `<div style="padding:.55rem 0;border-top:1px solid var(--line)">
+      <div><strong>${esc(label ?? '')}</strong>${t.verdict ? ` <span class="badge" style="background:var(--lain);font-size:.6rem">${esc(t.verdict)}</span>` : ''}</div>
+      <div style="margin-top:.25rem;font-size:.82rem">${esc(stance ?? '')}${refs}</div>
+      ${quotes}
+    </div>`
+  }).join('')
+  return `<div class="card" style="border:2px solid var(--accent)">
+    <h2>${L('stances_title')}</h2>
+    <p class="sub">${L('stances_sub')}</p>
+    ${items}
+  </div>`
+}
+
+function mudaSeatCard(seat, idx) {
+  if (idx.edition !== 'muda') return ''
+  const bm = state.lang === 'bm'
+  const demo = seat.demographics.find(d => d.election === 'JHR-SE-16') ?? seat.demographics[0]
+  const n = demo?.age?.age_18_20 ?? null
+  const perc = n != null && demo?.voters_total ? (100 * n / demo.voters_total).toFixed(1) : null
+  const mc = (idx.johor_context?.muda?.contests ?? []).find(c => c.code === seat.code)
+  if (n == null && !mc) return ''
+  return `<div class="card" style="border:2px solid var(--accent)">
+    <h2>${L('muda_seat_title')}</h2>
+    <ul class="points">
+      ${n != null ? `<li><strong>${fmtNum(n)}</strong> ${bm ? 'pengundi 18–20 tahun' : 'voters aged 18–20'}${perc ? ` (${perc}%)` : ''} ${bm ? 'di kerusi ini — dibuka oleh Undi18 (Syed Saddiq, 2019)' : 'in this seat — opened up by Undi18 (Syed Saddiq, 2019)'}</li>` : ''}
+      ${mc ? `<li>${bm ? 'MUDA bertanding di sini pada 2022' : 'MUDA contested here in 2022'}: <strong>${mc.perc}%</strong>${mc.won ? ` — <strong style="color:var(--accent)">${bm ? 'MENANG' : 'WON'}</strong>` : ''}</li>` : ''}
+    </ul>
+  </div>`
+}
+
+
+// ---- Johor crime context (johor_context.crime; neutral, both editions) ----
+const CRIME_TYPE_LABELS = {
+  causing_injury: { bm: 'Mencederakan', en: 'Causing injury' },
+  murder: { bm: 'Bunuh', en: 'Murder' },
+  rape: { bm: 'Rogol', en: 'Rape' },
+  robbery_gang_armed: { bm: 'Rompakan berkumpulan (bersenjata)', en: 'Gang robbery (armed)' },
+  robbery_gang_unarmed: { bm: 'Rompakan berkumpulan', en: 'Gang robbery' },
+  robbery_solo_armed: { bm: 'Rompakan (bersenjata)', en: 'Robbery (armed)' },
+  robbery_solo_unarmed: { bm: 'Rompakan', en: 'Robbery' },
+  break_in: { bm: 'Pecah rumah', en: 'Break-in' },
+  theft_other: { bm: 'Curi lain-lain', en: 'Other theft' },
+  theft_vehicle_lorry: { bm: 'Curi lori', en: 'Lorry theft' },
+  theft_vehicle_motorcar: { bm: 'Curi kereta', en: 'Car theft' },
+  theft_vehicle_motorcycle: { bm: 'Curi motosikal', en: 'Motorcycle theft' },
+}
+const crimeLabel = (t) => {
+  const l = CRIME_TYPE_LABELS[t]
+  return l ? (state.lang === 'bm' ? l.bm : l.en) : String(t).replace(/_/g, ' ')
+}
+
+function crimeCard(idx) {
+  const c = idx.johor_context?.crime
+  if (!c || !c.total_latest) return ''
+  const bm = state.lang === 'bm'
+  const types = (c.by_type_latest ?? []).slice(0, 6)
+  const maxT = Math.max(...types.map(t => t.value), 1)
+  const dists = (c.by_district_latest ?? []).slice(0, 6)
+  const maxD = Math.max(...dists.map(d => d.value), 1)
+  return `<div class="card">
+    <h2>${L('crime_title')}</h2>
+    <p class="sub">${L('crime_sub')} · ${esc(String(c.latest_year))}${c.source ? ` · ${esc(c.source)}` : ''}</p>
+    <div style="margin:.3rem 0 .5rem"><span style="font-size:1.6rem;font-weight:800">${fmtNum(c.total_latest)}</span>
+      <span style="color:var(--muted)"> ${bm ? 'jenayah indeks dilaporkan' : 'index crimes reported'} ${esc(String(c.latest_year))}${c.change_yoy_perc != null ? ` · ${deltaHtml(c.change_yoy_perc)} ${bm ? 'vs tahun sebelum' : 'vs prior year'}` : ''}</span></div>
+    <h3>${bm ? 'Jenis teratas' : 'Top crime types'}</h3>
+    ${types.map(t => barRow(crimeLabel(t.type), 100 * t.value / maxT, fmtNum(t.value))).join('')}
+    <h3>${bm ? 'Daerah polis teratas' : 'Top police districts'}</h3>
+    ${dists.map(d => barRow(esc(d.district), 100 * d.value / maxD, fmtNum(d.value))).join('')}
+    <div class="notice" style="font-size:.72rem;margin-top:.5rem">${L('crime_note')}</div>
+  </div>`
+}
+
 async function renderHome() {
   const idx = await loadIndex()
   const featured = idx.seats.filter(s => s.featured)
@@ -406,6 +544,7 @@ async function renderHome() {
   app.innerHTML = `
     <p class="sub" style="margin:2px 0 12px;color:var(--muted)">${L('tagline')}</p>
     ${countdownCard(idx)}
+    ${mudaHomeCard(idx)}
 
     <div class="card">
       <h2>${L('featured')}</h2>
@@ -438,6 +577,8 @@ async function renderHome() {
         <span class="chip">Diesel ${fmtRM(fuel.diesel)}</span>
       </div>` : ''}
     </div>
+
+    ${crimeCard(idx)}
 
     <div class="card">
       <h2>${L('all_seats')}</h2>
@@ -924,6 +1065,8 @@ function renderField(seat, bench, idx) {
   return `
     ${storyCard(seat, bench, idx)}
     ${issuesCard(seat)}
+    ${mudaStancesCard(seat)}
+    ${mudaSeatCard(seat, idx)}
     <div class="card">
       <h2>${L('talking_points')}</h2>
       <p class="sub">${L('tp_sub')}</p>

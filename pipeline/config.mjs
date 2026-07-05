@@ -2,6 +2,10 @@
 
 export const STATE = 'Johor'
 
+// Build edition: 'neutral' (default, the public data tool) or 'muda' (the
+// pro-MUDA advocacy build). Set via `EDITION=muda node pipeline/run.mjs`.
+export const EDITION = process.env.EDITION === 'muda' ? 'muda' : 'neutral'
+
 export const ELECTION_2026 = {
   id: 'JHR-SE-16',
   name_bm: 'Pilihan Raya Negeri Johor (PRN 2026)',
@@ -94,6 +98,7 @@ export const SOURCES = {
   lookupPremise: 'https://storage.data.gov.my/pricecatcher/lookup_premise.csv',
   lookupItem: 'https://storage.data.gov.my/pricecatcher/lookup_item.csv',
   pricecatcherMonth: (ym) => `https://storage.data.gov.my/pricecatcher/pricecatcher_${ym}.parquet`,
+  crimeDistrict: 'https://storage.data.gov.my/publicsafety/crime_district.parquet',
   dataCatalogue: (id, extra = '') => `https://api.data.gov.my/data-catalogue/?id=${id}${extra}`,
   pasarHealth: 'https://pasarapi.xyz/health',
   pasarApi: (id) => `https://pasarapi.xyz/api/apis/${id}`,

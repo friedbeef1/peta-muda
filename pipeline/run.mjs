@@ -5,7 +5,7 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { fetchJson } from './lib/fetch.mjs'
-import { SOURCES, DATASET_IDS, ELECTION_2026, STATE } from './config.mjs'
+import { SOURCES, DATASET_IDS, ELECTION_2026, STATE, EDITION } from './config.mjs'
 import { loadSeats } from './steps/seats.mjs'
 import { loadHistory, loadCareers } from './steps/history.mjs'
 import { loadSaluran } from './steps/saluran.mjs'
@@ -14,6 +14,7 @@ import { loadKawasanku } from './steps/kawasanku.mjs'
 import { loadSocio, loadDunParlimen, loadCpi, loadFuel } from './steps/socio.mjs'
 import { loadPrices, mergeDistrict } from './steps/prices.mjs'
 import { loadGeo } from './steps/geo.mjs'
+import { loadCrime } from './steps/crime.mjs'
 
 const OUT = path.join('site', 'data')
 const t0 = Date.now()
@@ -58,6 +59,8 @@ const { socio } = await loadSocio(seats)
 log('loading CPI + fuel')
 const cpi = await loadCpi()
 const fuel = await loadFuel()
+log('loading crime (Johor context)')
+const crime = await loadCrime()
 log('loading PriceCatcher (this downloads a few MB per month on first run)')
 const prices = await loadPrices()
 log(`basket: ${prices.basket.map(b => `${b.key}=#${b.code}(${b.johor_coverage})`).join(' ')}`)
@@ -75,6 +78,18 @@ let issuesManual = { seats: {}, statewide: [] }
 try {
   issuesManual = JSON.parse(await readFile(path.join('data', 'manual', 'issues.json'), 'utf8'))
 } catch { log('no manual issues.json, skipping local issues') }
+
+// ---- pro-MUDA edition: curated national record (advocacy build only) ----
+let mudaRecord = null
+let mudaStances = null
+if (EDITION === 'muda') {
+  try {
+    mudaRecord = JSON.parse(await readFile(path.join('data', 'manual', 'muda_record.json'), 'utf8'))
+  } catch { log('no muda_record.json, skipping MUDA record') }
+  try {
+    mudaStances = JSON.parse(await readFile(path.join('data', 'manual', 'muda_stances.json'), 'utf8'))
+  } catch { log('no muda_stances.json, skipping MUDA stances') }
+}
 
 // ---- results-integrity gate ----
 // Any contest that classifies as completed inside the 2026 election window
@@ -204,6 +219,10 @@ for (const seat of seats) {
       statewide: issuesManual.statewide ?? [],
       updated: issuesManual.updated ?? null,
     },
+    // pro-MUDA edition only: MUDA's stance on this seat's doorstep themes
+    muda_stances: mudaStances
+      ? (mudaStances.themes ?? []).filter(t => t.statewide || (t.applies_to ?? []).includes(seat.code))
+      : null,
   }
   await writeFile(path.join(OUT, 'seats', `${seat.slug}.json`), JSON.stringify(seatJson))
 
@@ -256,6 +275,43 @@ const sinceMedian = sinceSe15Items.length >= 3
   ? [...sinceSe15Items.map(i => i.perc)].sort((a, b) => a - b)[sinceSe15Items.length >> 1]
   : null
 
+// ---- Undi18 statewide rollup (neutral demographic fact) + MUDA Johor record ----
+// The 18-20 cohort is the tangible footprint of the 2019 voting-age reform;
+// summed across Johor it ships in BOTH editions (it is just demographics).
+const undi18 = (() => {
+  let total_18_20 = 0, total_voters = 0
+  const by_seat = []
+  for (const seat of seats) {
+    const rolls = demographics.get(seat.code) ?? []
+    const cur = rolls.find(d => d.election === 'JHR-SE-16') ?? rolls[0]
+    if (!cur) continue
+    const n = cur.age?.age_18_20 ?? 0
+    total_18_20 += n
+    total_voters += cur.voters_total ?? 0
+    by_seat.push({ code: seat.code, name: seat.name, slug: seat.slug, n_18_20: n, voters_total: cur.voters_total ?? null, perc: cur.voters_total ? +(100 * n / cur.voters_total).toFixed(1) : null })
+  }
+  by_seat.sort((a, b) => b.n_18_20 - a.n_18_20)
+  return { roll: 'JHR-SE-16', total_18_20, total_voters, perc: total_voters ? +(100 * total_18_20 / total_voters).toFixed(1) : null, by_seat }
+})()
+
+// MUDA's 2022 Johor performance from saluran bloc totals (advocacy edition only).
+const mudaJohor = EDITION === 'muda' ? (() => {
+  let muda_votes = 0, valid = 0
+  const contests = []
+  for (const seat of seats) {
+    const sal = saluran.get(seat.code)
+    const m = sal?.totals?.MUDA
+    if (!sal || !m) continue
+    const h2022 = (history.get(seat.code) ?? []).find(c => c.election === 'SE-15')
+    const won = h2022?.ballot?.some(b => b.party === 'MUDA' && (b.result ?? '').startsWith('won')) ?? false
+    muda_votes += m
+    valid += sal.valid
+    contests.push({ code: seat.code, name: seat.name, slug: seat.slug, muda_votes: m, valid: sal.valid, perc: sal.valid ? +(100 * m / sal.valid).toFixed(1) : null, won })
+  }
+  contests.sort((a, b) => b.perc - a.perc)
+  return { election: 'SE-15', date: '2022-03-12', seats_contested: contests.length, won: contests.filter(c => c.won).length, muda_votes, valid, avg_perc: valid ? +(100 * muda_votes / valid).toFixed(1) : null, contests }
+})() : null
+
 const index = {
   built_at: new Date().toISOString(),
   state: STATE,
@@ -268,6 +324,9 @@ const index = {
   price_months: prices.months_used,
   fuel,
   cpi,
+  edition: EDITION,
+  johor_context: { crime, undi18, muda: mudaJohor },
+  muda_record: mudaRecord,
   source_health: health,
   attribution: [
     { name: 'ElectionData.MY (Malaysian Election Corpus, CC0)', url: 'https://electiondata.my' },

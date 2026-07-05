@@ -22,6 +22,7 @@ const normalizeSeat = (s) => {
   // result_date is a new output field; committed data predates it, so ignore
   // it in the pending-fidelity baseline (real rebuilds populate it everywhere)
   if (c.election2026) delete c.election2026.result_date
+  delete c.muda_stances // new edition-gated field; committed data predates it
   if (c.election2026?.ballot) for (const b of c.election2026.ballot) b.career = b.career ? '<career>' : null
   if (c.saluran2022) for (const dm of c.saluran2022.dms) dm.turnout_perc = dm.turnout_perc == null ? null : Math.round(dm.turnout_perc)
   c.bbox = c.bbox ? c.bbox.map(v => Math.round(v * 10) / 10) : null
@@ -82,6 +83,50 @@ export async function verifyScenario(scenario, simDataDir, committedDataDir) {
     if (suhaizan) {
       const parties = new Set((suhaizan.career?.party_timeline ?? []).map(s => s.party))
       ok(parties.size > 1, `N.44 Suhaizan should show a multi-party timeline, got ${[...parties].join('/')}`)
+    }
+  }
+
+  // ---- MUDA edition gating + Undi18 rollup consistency (all scenarios) ----
+  {
+    const jc = sim.index.johor_context ?? {}
+    // crime: Johor context present with sane shape (fixtured from the real schema)
+    ok(jc.crime?.total_latest > 0, 'johor_context.crime missing/zero')
+    ok(jc.crime?.latest_year === '2023', `crime latest_year expected 2023, got ${jc.crime?.latest_year}`)
+    ok((jc.crime?.by_type_latest?.length ?? 0) > 0, 'crime by_type_latest empty')
+    ok((jc.crime?.by_district_latest?.length ?? 0) > 0, 'crime by_district_latest empty')
+    ok(!(jc.crime?.by_district_latest ?? []).some(d => d.district === 'All'), 'crime must exclude the All rollup district')
+    ok(!(jc.crime?.by_type_latest ?? []).some(t => t.type === 'all'), 'crime must exclude the all rollup type')
+    ok(jc.undi18?.total_18_20 > 0, 'undi18 rollup missing/zero')
+    let sum1820 = 0
+    for (const code of codes) {
+      const rolls = sim.seats[code].demographics ?? []
+      const d = rolls.find(x => x.election === 'JHR-SE-16') ?? rolls[0]
+      sum1820 += d?.age?.age_18_20 ?? 0
+    }
+    ok(jc.undi18?.total_18_20 === sum1820, `undi18 total ${jc.undi18?.total_18_20} != seat sum ${sum1820}`)
+    if (sim.index.edition === 'muda') {
+      ok((sim.index.muda_record?.national?.length ?? 0) > 0, 'muda edition missing muda_record.national')
+      ok((jc.muda?.seats_contested ?? 0) > 0, 'muda edition missing johor_context.muda')
+      const txt = JSON.stringify(sim.index.muda_record ?? {})
+      ok(!/MUDA (passed|tabled|meluluskan|membentangkan) undi18/i.test(txt), 'guardrail: Undi18 must attribute to Syed Saddiq, not the MUDA party')
+    } else {
+      ok(sim.index.muda_record == null, 'neutral edition must omit muda_record')
+      ok(jc.muda == null, 'neutral edition must omit johor_context.muda')
+    }
+    // stance layer: neutral seats carry null; muda seats carry arrays whose
+    // every quote is attributed AND sourced (no unsourced quotes, ever)
+    for (const code of codes) {
+      const st = sim.seats[code].muda_stances
+      if (sim.index.edition === 'muda') {
+        ok(st === null || Array.isArray(st), `${code}: muda_stances must be null or array`)
+        for (const t of st ?? []) {
+          for (const q of t.quotes ?? []) {
+            ok(!!(q.text && q.who && q.source), `${code}/${t.key}: quote missing text/who/source — unsourced quotes must not ship`)
+          }
+        }
+      } else {
+        ok(st == null, `${code}: neutral edition must omit muda_stances`)
+      }
     }
   }
 
