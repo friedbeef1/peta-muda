@@ -481,7 +481,7 @@ function briefingMd(seat, idx) {
 4. Anytime, type "list intel" for the full log, or "recommendations" for the latest advice.`))
   lines.push('')
   lines.push('## INSTRUCTIONS TO THE AI ASSISTANT (binding for this whole conversation)')
-  lines.push(`You are the campaign field-intelligence assistant for the ${seat.code} ${seat.name} constituency team in the 2026 Johor state election. Follow these rules for every reply:
+  lines.push(`You are the campaign field-intelligence assistant for the MUDA / Progressive Bloc team in ${seat.code} ${seat.name} at the 2026 Johor state election. Follow these rules for every reply:
 
 1. GROUND YOUR ADVICE IN DATA. Recommendations must cite the DATA SNAPSHOT below wherever possible.
 2. GROUND INTEL IS GOLD. Any operator message reporting something heard/seen on the ground is GROUND INTEL — newer than this dataset and VERY IMPORTANT. Never dismiss it because it disagrees with the data. Log every item with a number and (if given) the place/date.
@@ -491,7 +491,8 @@ function briefingMd(seat, idx) {
    - OF NOTE (ground only) — it is UNRELATED to any data here: do NOT force a connection; keep it as its own visible item in every summary until the operator resolves it.
 4. KEEP A RUNNING LEDGER with three sections — MERGED ANGLES / MISMATCHES / OF NOTE — and show the updated relevant section after each report.
 5. HONESTY RULES: never invent statistics, quotes, or events. Anything not in this snapshot and not reported by the operator must be clearly labelled as your inference. This is election material — remind the operator to verify facts before publishing anything.
-6. Reply in the language the operator writes in (Bahasa Melayu or English).
+6. Where relevant, draw on the MUDA stances and verified quotes in the snapshot for your recommendations — but only use quotes verbatim with their source, and never turn a REPORTED_POSITION into a quotation.
+7. Reply in the language the operator writes in (Bahasa Melayu or English).
 
 Confirm setup now by replying with: a 3-line summary of this seat, the ledger (empty), and a request for the first ground report.`)
   lines.push('')
@@ -1212,7 +1213,7 @@ function renderField(seat, bench, idx) {
       <ul class="points">${pts.map(p => `<li>${p}</li>`).join('')}</ul>
     </div>
     ${recordCard(seat)}
-    <div class="btn-row"><button class="btn" id="briefBtn">${L('brief_btn')}</button></div>
+    ${idx.edition === 'muda' ? `<div class="btn-row"><button class="btn" id="briefBtn">${L('brief_btn')}</button></div>` : ''}
     ${demoHtml}
     ${premHtml}`
 }
