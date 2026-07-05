@@ -64,6 +64,10 @@ const STR = {
     volunteer_get_btn: '🤖 Dapatkan briefing AI',
     volunteer_loading: 'Menjana…',
     volunteer_none: 'Tiada kerusi sepadan.',
+    volunteer_copied: (seat) => `✓ Briefing ${seat} disalin ke papan keratan`,
+    volunteer_cta_sub: 'Buka chat BARU, kemudian tampal (Cmd/Ctrl+V):',
+    volunteer_open_chatgpt: 'Buka ChatGPT',
+    volunteer_open_gemini: 'Buka Gemini',
     ceiling_title: 'Pematuhan harga siling kerajaan',
     ceiling_sub: 'Harga sebenar berbanding harga siling rasmi bagi 3 barangan terkawal',
     ceiling_observed: 'Harga tempatan',
@@ -196,6 +200,10 @@ const STR = {
     volunteer_get_btn: '🤖 Get my AI briefing',
     volunteer_loading: 'Generating…',
     volunteer_none: 'No matching seats.',
+    volunteer_copied: (seat) => `✓ ${seat} briefing copied to clipboard`,
+    volunteer_cta_sub: 'Open a NEW chat, then paste it in (Cmd/Ctrl+V):',
+    volunteer_open_chatgpt: 'Open ChatGPT',
+    volunteer_open_gemini: 'Open Gemini',
     ceiling_title: 'Government price-ceiling compliance',
     ceiling_sub: 'Local observed price vs. the official ceiling for the 3 controlled items',
     ceiling_observed: 'Local price',
@@ -489,6 +497,23 @@ function mudaHomeCard(idx) {
 // the data where related, listed separately ("OF NOTE") where not.
 // Edition-aware by construction: includes muda_stances only when the build
 // carries them. Plain text — no HTML escaping (this is an .md, not the DOM).
+// robust copy: Clipboard API first, then a hidden-textarea execCommand fallback
+// for insecure contexts / older browsers. Returns whether the copy succeeded.
+// (Same chain the shareBtn handler uses.)
+async function copyToClipboard(text) {
+  if (navigator.clipboard?.writeText) {
+    try { await navigator.clipboard.writeText(text); return true } catch { /* denied */ }
+  }
+  const ta = document.createElement('textarea')
+  ta.value = text
+  ta.style.position = 'fixed'; ta.style.opacity = '0'
+  document.body.appendChild(ta); ta.select()
+  let ok = false
+  try { ok = document.execCommand('copy') } catch { /* unsupported */ }
+  ta.remove()
+  return ok
+}
+
 // copies an AI briefing to the clipboard and always also downloads it (easiest
 // way to forward over WhatsApp); flashes the triggering button with feedback
 // origText overrides the "restore to" label — needed when the caller has
@@ -809,9 +834,26 @@ async function renderVolunteer() {
     <div class="card">
       <h2>${L('volunteer_title')}</h2>
       <p class="sub">${L('volunteer_sub')}</p>
+      <div id="volCta"></div>
       <input class="searchbox" id="volSearch" placeholder="${L('search')}" autocomplete="off">
       <div class="seat-list" id="volList"></div>
     </div>`
+
+  const ctaEl = document.getElementById('volCta')
+  // after a successful copy, surface a single obvious next step: paste into a
+  // fresh ChatGPT/Gemini chat. The briefing is far too large to prefill via a
+  // URL param, so "copy → open app → paste" is the only reliable path.
+  const showCta = (seat) => {
+    ctaEl.innerHTML = `<div class="cta-copied">
+      <div class="cta-copied-head">${L('volunteer_copied', `${esc(seat.code)} ${esc(seat.name)}`)}</div>
+      <div class="sub">${L('volunteer_cta_sub')}</div>
+      <div class="btn-row">
+        <a class="btn" href="https://chatgpt.com/" target="_blank" rel="noopener">${L('volunteer_open_chatgpt')}</a>
+        <a class="btn" href="https://gemini.google.com/app" target="_blank" rel="noopener">${L('volunteer_open_gemini')}</a>
+      </div>
+    </div>`
+    ctaEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+  }
 
   const listEl = document.getElementById('volList')
   const renderList = (q = '') => {
@@ -833,9 +875,19 @@ async function renderVolunteer() {
       btn.disabled = true
       try {
         const seat = await loadSeat(slug)
-        await copyAndDownloadBriefing(briefingMd(seat, idx), slug, btn, orig)
+        const md = briefingMd(seat, idx)
+        const copied = await copyToClipboard(md)
+        if (copied) {
+          btn.textContent = L('copied')
+          showCta(seat)
+        } else {
+          // no download fallback here — hand the raw text over so they can copy it
+          window.prompt('Salin / Copy:', md)
+          btn.textContent = orig
+        }
       } finally {
         btn.disabled = false
+        if (btn.textContent === L('copied')) setTimeout(() => { btn.textContent = orig }, 2000)
       }
     }))
   }
