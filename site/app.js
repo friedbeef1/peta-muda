@@ -55,6 +55,8 @@ const STR = {
     muda_record_title: 'Rekod kebangsaan (bersumber)',
     muda_seat_title: 'Kesan MUDA di kerusi ini',
     stances_title: 'Jawapan MUDA untuk isu tempatan',
+    brief_btn: '🤖 Briefing AI (untuk ChatGPT/Gemini)',
+    brief_saved: 'Fail .md dimuat turun!',
     stances_sub: 'Pendirian bersumber — sahkan sebelum menerbitkan bahan kempen',
     crime_title: 'Jenayah di Johor',
     crime_sub: 'Jenayah indeks berdaftar mengikut daerah polis',
@@ -170,6 +172,8 @@ const STR = {
     muda_record_title: 'National record (sourced)',
     muda_seat_title: "MUDA's footprint in this seat",
     stances_title: "MUDA's answer to the local issues",
+    brief_btn: '🤖 AI briefing (for ChatGPT/Gemini)',
+    brief_saved: '.md file downloaded!',
     stances_sub: 'Sourced positions — verify before publishing campaign material',
     crime_title: 'Crime in Johor',
     crime_sub: 'Registered index crime by police district',
@@ -447,6 +451,141 @@ function mudaHomeCard(idx) {
 
 // ---- MUDA's answer to this seat's doorstep issues (muda edition only —
 // neutral builds never carry seat.muda_stances, so presence is the gate) ----
+// ---- AI field briefing: a self-contained MD prompt for ChatGPT/Gemini.
+// Carries the seat's data snapshot + a ground-intel protocol: operator keeps
+// typing what they hear at the doors; the external assistant grounds advice in
+// the data but treats ground reports as the leading indicator — merged with
+// the data where related, listed separately ("OF NOTE") where not.
+// Edition-aware by construction: includes muda_stances only when the build
+// carries them. Plain text — no HTML escaping (this is an .md, not the DOM).
+function briefingMd(seat, idx) {
+  const bm = state.lang === 'bm'
+  const L2 = (b, e) => (bm ? b : e)
+  const demo = seat.demographics.find(d => d.election === 'JHR-SE-16') ?? seat.demographics[0]
+  const lines = []
+  const px = (v, d = 1) => v == null ? '–' : Number(v).toFixed(d) + '%'
+  const nf = (v) => v == null ? '–' : Number(v).toLocaleString('en-MY')
+
+  lines.push(`# PETA MUDA — AI Field Briefing: ${seat.code} ${seat.name} (PRN Johor 2026)`)
+  lines.push(`Generated ${new Date().toISOString().slice(0, 10)} from official open data (ElectionData.MY CC0; data.gov.my/OpenDOSM & KPDN PriceCatcher CC BY 4.0). Data built: ${idx.built_at?.slice(0, 10) ?? '–'}. Polling day: 11 July 2026 (early voting 7 July).`)
+  lines.push('')
+  lines.push(`## ${L2('CARA GUNA (untuk petugas lapangan)', 'HOW TO USE (for the field operator)')}`)
+  lines.push(L2(
+`1. Buka chat BARU di ChatGPT atau Gemini.
+2. Tampal SELURUH dokumen ini sebagai mesej pertama. Pembantu AI akan sahkan persediaan.
+3. Selepas itu, taip sahaja apa yang anda dengar di lapangan (BM atau Inggeris). Contoh: "LAPORAN: Pengundi Taman Molek kata bekalan air putus lagi semalam."
+4. Bila-bila masa, taip "senaraikan intel" untuk log penuh, atau "cadangan" untuk nasihat terkini.`,
+`1. Open a NEW chat in ChatGPT or Gemini.
+2. Paste this ENTIRE document as your first message. The assistant will confirm setup.
+3. After that, just type what you hear on the ground (BM or English). Example: "REPORT: Taman Molek voters say the water cut again last night."
+4. Anytime, type "list intel" for the full log, or "recommendations" for the latest advice.`))
+  lines.push('')
+  lines.push('## INSTRUCTIONS TO THE AI ASSISTANT (binding for this whole conversation)')
+  lines.push(`You are the campaign field-intelligence assistant for the ${seat.code} ${seat.name} constituency team in the 2026 Johor state election. Follow these rules for every reply:
+
+1. GROUND YOUR ADVICE IN DATA. Recommendations must cite the DATA SNAPSHOT below wherever possible.
+2. GROUND INTEL IS GOLD. Any operator message reporting something heard/seen on the ground is GROUND INTEL — newer than this dataset and VERY IMPORTANT. Never dismiss it because it disagrees with the data. Log every item with a number and (if given) the place/date.
+3. TRIAGE every new report into exactly one of:
+   - MERGED ANGLE — it RELATES to something in the data: combine both into one doorstep-ready line ("the data shows X, you are hearing Y — so lead with Z").
+   - ⚠ DATA-GROUND MISMATCH — it CONTRADICTS the data: flag the mismatch explicitly, treat the ground report as the leading indicator, suggest one quick verification step, and adjust your recommendations meanwhile.
+   - OF NOTE (ground only) — it is UNRELATED to any data here: do NOT force a connection; keep it as its own visible item in every summary until the operator resolves it.
+4. KEEP A RUNNING LEDGER with three sections — MERGED ANGLES / MISMATCHES / OF NOTE — and show the updated relevant section after each report.
+5. HONESTY RULES: never invent statistics, quotes, or events. Anything not in this snapshot and not reported by the operator must be clearly labelled as your inference. This is election material — remind the operator to verify facts before publishing anything.
+6. Reply in the language the operator writes in (Bahasa Melayu or English).
+
+Confirm setup now by replying with: a 3-line summary of this seat, the ledger (empty), and a request for the first ground report.`)
+  lines.push('')
+  lines.push('## DATA SNAPSHOT')
+
+  // 2026 contest
+  const e = seat.election2026
+  lines.push(`### The 2026 contest (${e.result_date ? 'RESULTS IN' : 'candidates on the ballot'})`)
+  const contestBallot = e.ballot ?? (seat.history ?? []).find(c => c.date === e.result_date)?.ballot ?? []
+  for (const b of contestBallot) {
+    const c = b.career
+    const cv = c ? `${c.contested} contests, ${c.won} won${c.party_timeline?.length > 1 ? '; party path: ' + c.party_timeline.map(s => s.party).join(' > ') + ' > ' + b.party : ''}` : 'first-time candidate'
+    const res = b.result && b.result !== 'pending' ? ` | RESULT: ${b.result}${b.votes ? `, ${nf(b.votes)} votes (${px(b.votes_perc)})` : ''}` : ''
+    lines.push(`- ${b.name} (${b.party}${b.coalition && b.coalition !== 'ALONE' ? '/' + b.coalition : ''}) — ${cv}${res}`)
+  }
+  if (e.muda_candidate) lines.push(`- Progressive Bloc candidate here: ${e.muda_candidate} (${e.bloc_party ?? 'MUDA/PSM'})`)
+
+  // voters
+  if (demo) {
+    lines.push('', '### Voters (2026 roll)')
+    const yt = demo.age.age_18_20 + demo.age.age_21_29
+    lines.push(`- Total ${nf(demo.voters_total)} | aged 18-20: ${nf(demo.age.age_18_20)} | aged 18-29: ${nf(yt)} (${px(100 * yt / demo.voters_total)}) | women: ${px(100 * demo.sex_female / demo.voters_total, 0)}`)
+    lines.push(`- Ethnic: Malay ${px(100 * demo.ethnic.ethnic_malay / demo.voters_total, 0)}, Chinese ${px(100 * demo.ethnic.ethnic_chinese / demo.voters_total, 0)}, Indian ${px(100 * demo.ethnic.ethnic_indian / demo.voters_total, 0)}`)
+  }
+
+  // history + saluran
+  const last = (seat.history ?? [])[0]
+  if (last) {
+    lines.push('', '### Last result & turnout')
+    const w = last.ballot.find(b => (b.result ?? '').startsWith('won')) ?? last.ballot[0]
+    lines.push(`- ${last.election} (${last.date}): ${w?.name ?? '–'} (${w?.party ?? '–'}) won, majority ${px(last.majority_perc)}, turnout ${px(last.voter_turnout_perc)}`)
+  }
+  const sal = seat.saluran2022
+  if (sal) {
+    const tot = Object.entries(sal.totals).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k} ${px(100 * v / sal.valid)}`).join(', ')
+    lines.push(`- 2022 bloc shares here: ${tot} (${sal.dms.length} polling districts — low-turnout young areas are the known lever)`)
+  }
+
+  // cost of living
+  const movers = (seat.prices?.items ?? []).filter(i => i.change_12w_perc != null).sort((a, b) => b.change_12w_perc - a.change_12w_perc).slice(0, 3)
+  if (movers.length || seat.socio?.income?.length) {
+    lines.push('', '### Cost of living here')
+    if (movers.length) lines.push(`- Top price rises (12 weeks, ${seat.prices.district ?? 'Johor'} district medians): ` + movers.map(i => `${i.label_en} +${i.change_12w_perc}%`).join(', '))
+    const inc = seat.socio?.income?.at(-1)
+    if (inc) lines.push(`- Median household income: RM${nf(inc.income_median)} (${'' + (seat.socio.income.at(-1).date ?? '').slice(0, 4)})`)
+    const lab = seat.socio?.labour?.at(-1)
+    if (lab?.u_rate != null) lines.push(`- Unemployment rate: ${px(lab.u_rate)}`)
+  }
+
+  // verified local issues
+  const li = seat.local_issues
+  const issues = [...(li?.seat ?? []), ...(li?.statewide ?? [])]
+  if (issues.length) {
+    lines.push('', '### Verified local issues (fact-checked, with receipts)')
+    issues.forEach((it, i) => {
+      lines.push(`${i + 1}. ${it.issue_en ?? it.issue_bm}`)
+      if (it.receipt_en ?? it.receipt_bm) lines.push(`   Receipt: ${it.receipt_en ?? it.receipt_bm}`)
+      if (it.sources?.length) lines.push(`   Sources: ${it.sources.join(' ; ')}`)
+    })
+  }
+
+  // muda stances (muda edition only — field simply absent otherwise)
+  if (seat.muda_stances?.length) {
+    lines.push('', "### MUDA's positions on these issues (sourced; quote-verbatim only where marked)")
+    for (const t of seat.muda_stances) {
+      lines.push(`- [${t.verdict}] ${t.label_en ?? t.label_bm}: ${t.stance_en ?? t.stance_bm}`)
+      for (const q of t.quotes ?? []) {
+        lines.push(`  QUOTE: "${q.text}" — ${q.who}, ${q.role_en ?? q.role_bm ?? ''} (${(q.date ?? '').slice(0, 7)}) ${q.source}`)
+      }
+    }
+    lines.push('  NOTE FOR ASSISTANT: never paraphrase these into new quotes; REPORTED_POSITION and NO_VERIFIED_POSITION themes must never gain quotation marks.')
+  }
+
+  // johor context
+  const jc = idx.johor_context
+  if (jc?.undi18 || jc?.crime) {
+    lines.push('', '### Johor context')
+    if (jc.undi18) lines.push(`- Undi18 footprint: ${nf(jc.undi18.total_18_20)} voters aged 18-20 statewide on the 2026 roll${demo ? `; this seat: ${nf(demo.age.age_18_20)}` : ''}`)
+    if (jc.crime) lines.push(`- Crime (${jc.crime.latest_year}, police districts ≠ constituencies): ${nf(jc.crime.total_latest)} index crimes statewide, ${jc.crime.change_yoy_perc > 0 ? '+' : ''}${jc.crime.change_yoy_perc ?? '–'}% YoY; top type: ${jc.crime.by_type_latest?.[0]?.type ?? '–'}`)
+    const fuel = idx.fuel?.at(-1)
+    if (fuel) lines.push(`- Fuel: RON95 BUDI95 RM${fuel.ron95_budi95 ?? '–'} / unsubsidised RM${fuel.ron95 ?? '–'} / diesel RM${fuel.diesel ?? '–'}`)
+    const cpi = idx.cpi?.at(-1)
+    if (cpi) lines.push(`- Official Johor inflation: ${px(cpi.inflation_yoy)} YoY (${cpi.date?.slice(0, 7)})`)
+  }
+
+  lines.push('', '## DATA CAVEATS (assistant must respect these)')
+  lines.push(`- Prices are KPDN premise medians by market district — a catchment approximation, not exact to the constituency.
+- Crime data is by POLICE district and statewide context only — never present it as this constituency's figure.
+- Data snapshot is as of the build date above; the operator's ground reports are newer. Treat accordingly.
+- Verify all facts before publishing campaign material. Quotes above are only usable verbatim with their source cited.`)
+
+  return lines.join('\n')
+}
+
 function mudaStancesCard(seat) {
   const themes = seat.muda_stances
   if (!themes?.length) return ''
@@ -1073,6 +1212,7 @@ function renderField(seat, bench, idx) {
       <ul class="points">${pts.map(p => `<li>${p}</li>`).join('')}</ul>
     </div>
     ${recordCard(seat)}
+    <div class="btn-row"><button class="btn" id="briefBtn">${L('brief_btn')}</button></div>
     ${demoHtml}
     ${premHtml}`
 }
@@ -1235,6 +1375,25 @@ async function renderSeat(slug, tab = 'brief') {
     a.download = `${seat.slug}-saluran-2022.csv`
     a.click()
     URL.revokeObjectURL(a.href)
+  })
+
+  const briefBtn = document.getElementById('briefBtn')
+  if (briefBtn) briefBtn.addEventListener('click', async () => {
+    const md = briefingMd(seat, idx)
+    let copied = false
+    if (navigator.clipboard?.writeText) {
+      try { await navigator.clipboard.writeText(md); copied = true } catch { /* denied */ }
+    }
+    // always also download — easiest to forward to the field over WhatsApp
+    const blob = new Blob([md], { type: 'text/markdown' })
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(blob)
+    a.download = `${seat.slug}-ai-briefing.md`
+    a.click()
+    URL.revokeObjectURL(a.href)
+    const orig = briefBtn.textContent
+    briefBtn.textContent = copied ? L('copied') : L('brief_saved')
+    setTimeout(() => { briefBtn.textContent = orig }, 2000)
   })
 
   renderFooter(idx)
