@@ -54,6 +54,8 @@ const STR = {
     muda_title: 'MUDA — parti kecil, kesan besar',
     muda_record_title: 'Rekod kebangsaan (bersumber)',
     muda_seat_title: 'Kesan MUDA di kerusi ini',
+    stances_title: 'Jawapan MUDA untuk isu tempatan',
+    stances_sub: 'Pendirian bersumber — sahkan sebelum menerbitkan bahan kempen',
     crime_title: 'Jenayah di Johor',
     crime_sub: 'Jenayah indeks berdaftar mengikut daerah polis',
     crime_note: 'Data PDRM peringkat daerah polis (bukan kerusi). Sahkan sebelum menerbitkan.',
@@ -167,6 +169,8 @@ const STR = {
     muda_title: 'MUDA — small party, big bite',
     muda_record_title: 'National record (sourced)',
     muda_seat_title: "MUDA's footprint in this seat",
+    stances_title: "MUDA's answer to the local issues",
+    stances_sub: 'Sourced positions — verify before publishing campaign material',
     crime_title: 'Crime in Johor',
     crime_sub: 'Registered index crime by police district',
     crime_note: 'PDRM data at police-district level (not per seat). Verify before publishing.',
@@ -438,6 +442,37 @@ function mudaHomeCard(idx) {
     ${sub ? `<p class="sub">${esc(sub)}</p>` : ''}
     ${stats.length ? `<div style="display:flex;gap:1.2rem;flex-wrap:wrap;margin:.6rem 0 .2rem">${stats.join('')}</div>` : ''}
     ${rec ? `<h3>${L('muda_record_title')}</h3><ul class="points">${mudaRecordList(rec)}</ul>` : ''}
+  </div>`
+}
+
+// ---- MUDA's answer to this seat's doorstep issues (muda edition only —
+// neutral builds never carry seat.muda_stances, so presence is the gate) ----
+function mudaStancesCard(seat) {
+  const themes = seat.muda_stances
+  if (!themes?.length) return ''
+  const bm = state.lang === 'bm'
+  const items = themes.map(t => {
+    const label = bm ? (t.label_bm ?? t.label_en) : (t.label_en ?? t.label_bm)
+    const stance = bm ? (t.stance_bm ?? t.stance_en) : (t.stance_en ?? t.stance_bm)
+    const refs = (t.sources ?? []).map((u, i) =>
+      ` <a href="${esc(u)}" target="_blank" rel="noopener" style="color:var(--muted)">[${i + 1}]</a>`).join('')
+    const quotes = (t.quotes ?? []).map(q => {
+      const role = bm ? (q.role_bm ?? q.role_en) : (q.role_en ?? q.role_bm)
+      return `<blockquote style="margin:.45rem 0 0;padding:.4rem .6rem;border-left:3px solid var(--accent);background:var(--bg2,rgba(0,0,0,.03));font-size:.8rem">
+        “${esc(q.text)}”
+        <br><span style="color:var(--muted);font-size:.72rem">— ${esc(q.who)}${role ? `, ${esc(role)}` : ''}${q.date ? ` (${esc(q.date.slice(0, 7))})` : ''}${q.source ? ` <a href="${esc(q.source)}" target="_blank" rel="noopener" style="color:var(--muted)">[sumber]</a>` : ''}</span>
+      </blockquote>`
+    }).join('')
+    return `<div style="padding:.55rem 0;border-top:1px solid var(--line)">
+      <div><strong>${esc(label ?? '')}</strong>${t.verdict ? ` <span class="badge" style="background:var(--lain);font-size:.6rem">${esc(t.verdict)}</span>` : ''}</div>
+      <div style="margin-top:.25rem;font-size:.82rem">${esc(stance ?? '')}${refs}</div>
+      ${quotes}
+    </div>`
+  }).join('')
+  return `<div class="card" style="border:2px solid var(--accent)">
+    <h2>${L('stances_title')}</h2>
+    <p class="sub">${L('stances_sub')}</p>
+    ${items}
   </div>`
 }
 
@@ -1030,6 +1065,7 @@ function renderField(seat, bench, idx) {
   return `
     ${storyCard(seat, bench, idx)}
     ${issuesCard(seat)}
+    ${mudaStancesCard(seat)}
     ${mudaSeatCard(seat, idx)}
     <div class="card">
       <h2>${L('talking_points')}</h2>

@@ -22,6 +22,7 @@ const normalizeSeat = (s) => {
   // result_date is a new output field; committed data predates it, so ignore
   // it in the pending-fidelity baseline (real rebuilds populate it everywhere)
   if (c.election2026) delete c.election2026.result_date
+  delete c.muda_stances // new edition-gated field; committed data predates it
   if (c.election2026?.ballot) for (const b of c.election2026.ballot) b.career = b.career ? '<career>' : null
   if (c.saluran2022) for (const dm of c.saluran2022.dms) dm.turnout_perc = dm.turnout_perc == null ? null : Math.round(dm.turnout_perc)
   c.bbox = c.bbox ? c.bbox.map(v => Math.round(v * 10) / 10) : null
@@ -111,6 +112,21 @@ export async function verifyScenario(scenario, simDataDir, committedDataDir) {
     } else {
       ok(sim.index.muda_record == null, 'neutral edition must omit muda_record')
       ok(jc.muda == null, 'neutral edition must omit johor_context.muda')
+    }
+    // stance layer: neutral seats carry null; muda seats carry arrays whose
+    // every quote is attributed AND sourced (no unsourced quotes, ever)
+    for (const code of codes) {
+      const st = sim.seats[code].muda_stances
+      if (sim.index.edition === 'muda') {
+        ok(st === null || Array.isArray(st), `${code}: muda_stances must be null or array`)
+        for (const t of st ?? []) {
+          for (const q of t.quotes ?? []) {
+            ok(!!(q.text && q.who && q.source), `${code}/${t.key}: quote missing text/who/source — unsourced quotes must not ship`)
+          }
+        }
+      } else {
+        ok(st == null, `${code}: neutral edition must omit muda_stances`)
+      }
     }
   }
 

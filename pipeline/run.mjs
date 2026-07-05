@@ -81,10 +81,14 @@ try {
 
 // ---- pro-MUDA edition: curated national record (advocacy build only) ----
 let mudaRecord = null
+let mudaStances = null
 if (EDITION === 'muda') {
   try {
     mudaRecord = JSON.parse(await readFile(path.join('data', 'manual', 'muda_record.json'), 'utf8'))
   } catch { log('no muda_record.json, skipping MUDA record') }
+  try {
+    mudaStances = JSON.parse(await readFile(path.join('data', 'manual', 'muda_stances.json'), 'utf8'))
+  } catch { log('no muda_stances.json, skipping MUDA stances') }
 }
 
 // ---- results-integrity gate ----
@@ -215,6 +219,10 @@ for (const seat of seats) {
       statewide: issuesManual.statewide ?? [],
       updated: issuesManual.updated ?? null,
     },
+    // pro-MUDA edition only: MUDA's stance on this seat's doorstep themes
+    muda_stances: mudaStances
+      ? (mudaStances.themes ?? []).filter(t => t.statewide || (t.applies_to ?? []).includes(seat.code))
+      : null,
   }
   await writeFile(path.join(OUT, 'seats', `${seat.slug}.json`), JSON.stringify(seatJson))
 
