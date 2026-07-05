@@ -113,6 +113,9 @@ const STR = {
     beat_message: 'Mesej di pintu',
     beat_ground: 'Peta lapangan',
     beat_ask: 'Tindakan',
+    beat_local: 'Tempatan',
+    beat_national: 'Nasional',
+    issues_national: 'Nasional',
     issues_title: 'Isu tempatan (disahkan sumber)',
     issues_sub: 'Isu khusus kawasan ini, disemak terhadap laporan berita — nombor rujukan boleh diklik',
     issues_statewide: 'Seluruh Johor',
@@ -249,6 +252,9 @@ const STR = {
     beat_message: 'The doorstep message',
     beat_ground: 'The ground map',
     beat_ask: 'The ask',
+    beat_local: 'Local',
+    beat_national: 'National',
+    issues_national: 'National',
     issues_title: 'Local issues (source-verified)',
     issues_sub: 'Issues specific to this area, checked against news reporting — reference numbers are clickable',
     issues_statewide: 'Johor-wide',
@@ -626,6 +632,17 @@ Confirm setup now by replying with: a 3-line summary of this seat, the ledger (e
   if (issues.length) {
     lines.push('', '### Verified local issues (fact-checked, with receipts)')
     issues.forEach((it, i) => {
+      lines.push(`${i + 1}. ${it.issue_en ?? it.issue_bm}`)
+      if (it.receipt_en ?? it.receipt_bm) lines.push(`   Receipt: ${it.receipt_en ?? it.receipt_bm}`)
+      if (it.sources?.length) lines.push(`   Sources: ${it.sources.join(' ; ')}`)
+    })
+  }
+
+  // verified national issues (same curation discipline, uniform across seats)
+  const natIssues = idx.national_issues ?? []
+  if (natIssues.length) {
+    lines.push('', '### Verified national issues (fact-checked, with receipts)')
+    natIssues.forEach((it, i) => {
       lines.push(`${i + 1}. ${it.issue_en ?? it.issue_bm}`)
       if (it.receipt_en ?? it.receipt_bm) lines.push(`   Receipt: ${it.receipt_en ?? it.receipt_bm}`)
       if (it.sources?.length) lines.push(`   Sources: ${it.sources.join(' ; ')}`)
@@ -1166,6 +1183,36 @@ function talkingPoints(seat, bench, idx) {
 // The prioritized 5-beat narrative: one story a candidate can carry, ordered
 // by what wins the seat — path, people, message, ground, ask. Every number is
 // pulled from the same verified data as the sections below it.
+// The punchy head of a curated issue string for a one-line doorstep message:
+// the clause before the first " — ", trimmed to a sentence / ~140 chars. Full
+// receipts and sources stay in issuesCard.
+function leadClause(text) {
+  if (!text) return ''
+  const head = text.split(' — ')[0].trim()
+  if (head.length <= 140) return head
+  const m = head.match(/^.*?[.!?](?=\s|$)/)
+  const sent = m ? m[0].trim() : head
+  return sent.length <= 140 ? sent : head.slice(0, 137).trimEnd() + '…'
+}
+
+// MUDA's official line for an issue theme (muda edition only — neutral builds
+// carry no seat.muda_stances, so this renders nothing there). Returns a small
+// appended HTML fragment: the stance lead + the top sourced leader quote with
+// attribution. NO_VERIFIED_POSITION themes get their honest stance line and
+// never a quotation; quotes[] entries are verified exact words by contract.
+function mudaAngleFor(theme, seat) {
+  if (!theme) return ''
+  const t = (seat.muda_stances ?? []).find(s => s.key === theme)
+  if (!t) return ''
+  const bm = state.lang === 'bm'
+  const stanceLead = leadClause(bm ? (t.stance_bm ?? t.stance_en) : (t.stance_en ?? t.stance_bm))
+  const q = (t.quotes ?? [])[0]
+  const quoteHtml = q
+    ? `<br>“${esc(q.text)}” — <strong>${esc(q.who)}</strong>, ${esc(bm ? (q.role_bm ?? q.role_en ?? '') : (q.role_en ?? q.role_bm ?? ''))} (${esc((q.date ?? '').slice(0, 4))})`
+    : ''
+  return `<br><span style="color:var(--muted);font-size:.82rem"><strong>MUDA:</strong> ${esc(stanceLead)}${quoteHtml}</span>`
+}
+
 function storyFor(seat, bench, idx) {
   const bm = state.lang === 'bm'
   const beats = []
@@ -1197,26 +1244,25 @@ function storyFor(seat, bench, idx) {
     beats.push({
       title: L('beat_voters'),
       text: bm
-        ? `<strong>${fmtNum(youthN)}</strong> pengundi bawah 30 (${youthP}% daftar 2026)${newV ? `, termasuk <strong>${fmtNum(newV)}</strong> pengundi baharu sejak PRU15` : ''}. Merekalah yang menentukan langkah 1.`
-        : `<strong>${fmtNum(youthN)}</strong> voters under 30 (${youthP}% of the 2026 roll)${newV ? `, including <strong>${fmtNum(newV)}</strong> new voters since GE15` : ''}. They decide beat 1.`,
+        ? `<strong>${fmtNum(youthN)}</strong> pengundi bawah 30 (${youthP}% daftar 2026)${newV ? `, termasuk <strong>${fmtNum(newV)}</strong> pengundi baharu sejak PRU15` : ''}.`
+        : `<strong>${fmtNum(youthN)}</strong> voters under 30 (${youthP}% of the 2026 roll)${newV ? `, including <strong>${fmtNum(newV)}</strong> new voters since GE15` : ''}.`,
     })
   }
 
-  // 3 — the doorstep message (one issue, not twelve)
-  const risers = seat.prices.items
-    .filter(i => i.change_12w_perc != null && i.change_12w_perc >= 3)
-    .sort((a, b) => b.change_12w_perc - a.change_12w_perc)
-  const r = raceStats(seat, idx)
-  if (risers.length) {
-    const top = risers[0]
-    const lbl = (bm ? top.label_bm : top.label_en).toLowerCase()
-    const cpi = r?.cpiYoy
-    beats.push({
-      title: L('beat_message'),
-      text: bm
-        ? `Satu isu, satu mesej: harga <strong>${esc(lbl)}</strong> naik <strong>${top.change_12w_perc}%</strong> dalam 12 minggu di ${esc(seat.prices.district ?? 'Johor')}${cpi != null ? ` — sedangkan inflasi rasmi kata ${cpi.toFixed(1)}% SETAHUN` : ''}. Tunjukkan harga di pasar mereka sendiri (senarai premis di bawah).`
-        : `One issue, one message: <strong>${esc(lbl)}</strong> up <strong>${top.change_12w_perc}%</strong> in 12 weeks in ${esc(seat.prices.district ?? 'Johor')}${cpi != null ? ` — while official inflation says ${cpi.toFixed(1)}% A YEAR` : ''}. Show them prices from their own market (premise list below).`,
-    })
+  // 3 — the doorstep message: one local issue + one national issue (full
+  // receipts + sources live in issuesCard below; muda edition overlays MUDA's
+  // stance + a sourced leader quote so it lands as the party's official line)
+  const localIssue = seat.local_issues?.seat?.[0] ?? seat.local_issues?.statewide?.[0] ?? null
+  const nationalIssue = idx.national_issues?.[0] ?? null
+  if (localIssue || nationalIssue) {
+    const section = (label, issue) => {
+      if (!issue) return ''
+      const lead = leadClause(bm ? (issue.issue_bm ?? issue.issue_en) : (issue.issue_en ?? issue.issue_bm))
+      const angle = mudaAngleFor(issue.theme, seat)
+      return `<strong>${label}:</strong> ${esc(lead)}${angle}`
+    }
+    const parts = [section(L('beat_local'), localIssue), section(L('beat_national'), nationalIssue)].filter(Boolean)
+    beats.push({ title: L('beat_message'), text: parts.join('<br>') })
   }
 
   // 4 — the ground map (where to spend shoe leather)
@@ -1274,8 +1320,9 @@ function storyCard(seat, bench, idx) {
   </div>`
 }
 
-// Curated, source-verified local issues (data/manual/issues.json via pipeline).
-function issuesCard(seat) {
+// Curated, source-verified issues: this seat's local ones, the Johor-statewide
+// set (data/manual/issues.json), and the national set (national_issues.json).
+function issuesCard(seat, idx) {
   const li = seat.local_issues
   if (!li) return ''
   const bm = state.lang === 'bm'
@@ -1288,13 +1335,15 @@ function issuesCard(seat) {
   }).join('')
   const seatItems = li.seat ?? []
   const stateItems = li.statewide ?? []
-  if (!seatItems.length && !stateItems.length) return ''
+  const nationalItems = idx?.national_issues ?? []
+  if (!seatItems.length && !stateItems.length && !nationalItems.length) return ''
   return `<div class="card">
     <h2>${L('issues_title')}</h2>
     <p class="sub">${L('issues_sub')}</p>
     <ul class="points">
       ${render(seatItems, null)}
       ${render(stateItems, L('issues_statewide'))}
+      ${render(nationalItems, L('issues_national'))}
     </ul>
   </div>`
 }
@@ -1391,7 +1440,7 @@ function renderField(seat, bench, idx) {
 
   return `
     ${storyCard(seat, bench, idx)}
-    ${issuesCard(seat)}
+    ${issuesCard(seat, idx)}
     ${mudaStancesCard(seat)}
     ${mudaSeatCard(seat, idx)}
     <div class="card">

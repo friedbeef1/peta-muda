@@ -79,6 +79,13 @@ try {
   issuesManual = JSON.parse(await readFile(path.join('data', 'manual', 'issues.json'), 'utf8'))
 } catch { log('no manual issues.json, skipping local issues') }
 
+// ---- curated national issues (research-verified, hand-maintained; neutral,
+// both editions — sourced facts like issues.json, surfaced app-wide) ----
+let nationalIssues = { issues: [] }
+try {
+  nationalIssues = JSON.parse(await readFile(path.join('data', 'manual', 'national_issues.json'), 'utf8'))
+} catch { log('no manual national_issues.json, skipping national issues') }
+
 // ---- government price ceilings (hand-maintained; neutral, both editions) ----
 let priceCeilings = { items: {} }
 try {
@@ -339,6 +346,7 @@ const index = {
   fuel,
   cpi,
   edition: EDITION,
+  national_issues: nationalIssues.issues ?? [],
   johor_context: { crime, undi18, muda: mudaJohor },
   muda_record: mudaRecord,
   source_health: health,
