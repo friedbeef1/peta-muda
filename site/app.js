@@ -58,6 +58,12 @@ const STR = {
     brief_btn: '🤖 Briefing AI (untuk ChatGPT/Gemini)',
     brief_saved: 'Fail .md dimuat turun!',
     stances_sub: 'Pendirian bersumber — sahkan sebelum menerbitkan bahan kempen',
+    volunteer_nav: '🤖 Briefing AI untuk sukarelawan →',
+    volunteer_title: 'Briefing AI untuk sukarelawan',
+    volunteer_sub: 'Cari kerusi anda, dapatkan briefing AI dalam satu ketikan — sedia untuk ditampal terus ke ChatGPT/Gemini.',
+    volunteer_get_btn: '🤖 Dapatkan briefing AI',
+    volunteer_loading: 'Menjana…',
+    volunteer_none: 'Tiada kerusi sepadan.',
     ceiling_title: 'Pematuhan harga siling kerajaan',
     ceiling_sub: 'Harga sebenar berbanding harga siling rasmi bagi 3 barangan terkawal',
     ceiling_observed: 'Harga tempatan',
@@ -184,6 +190,12 @@ const STR = {
     brief_btn: '🤖 AI briefing (for ChatGPT/Gemini)',
     brief_saved: '.md file downloaded!',
     stances_sub: 'Sourced positions — verify before publishing campaign material',
+    volunteer_nav: '🤖 Volunteer AI briefings →',
+    volunteer_title: 'Volunteer AI briefings',
+    volunteer_sub: 'Find your seat, get an AI briefing in one tap — ready to paste straight into ChatGPT/Gemini.',
+    volunteer_get_btn: '🤖 Get my AI briefing',
+    volunteer_loading: 'Generating…',
+    volunteer_none: 'No matching seats.',
     ceiling_title: 'Government price-ceiling compliance',
     ceiling_sub: 'Local observed price vs. the official ceiling for the 3 controlled items',
     ceiling_observed: 'Local price',
@@ -464,6 +476,7 @@ function mudaHomeCard(idx) {
     ${sub ? `<p class="sub">${esc(sub)}</p>` : ''}
     ${stats.length ? `<div style="display:flex;gap:1.2rem;flex-wrap:wrap;margin:.6rem 0 .2rem">${stats.join('')}</div>` : ''}
     ${rec ? `<h3>${L('muda_record_title')}</h3><ul class="points">${mudaRecordList(rec)}</ul>` : ''}
+    <div class="btn-row"><a class="btn secondary" href="#/volunteer">${L('volunteer_nav')}</a></div>
   </div>`
 }
 
@@ -476,6 +489,28 @@ function mudaHomeCard(idx) {
 // the data where related, listed separately ("OF NOTE") where not.
 // Edition-aware by construction: includes muda_stances only when the build
 // carries them. Plain text — no HTML escaping (this is an .md, not the DOM).
+// copies an AI briefing to the clipboard and always also downloads it (easiest
+// way to forward over WhatsApp); flashes the triggering button with feedback
+// origText overrides the "restore to" label — needed when the caller has
+// already replaced btnEl's text with a loading indicator before this resolves
+async function copyAndDownloadBriefing(md, slug, btnEl, origText) {
+  let copied = false
+  if (navigator.clipboard?.writeText) {
+    try { await navigator.clipboard.writeText(md); copied = true } catch { /* denied */ }
+  }
+  const blob = new Blob([md], { type: 'text/markdown' })
+  const a = document.createElement('a')
+  a.href = URL.createObjectURL(blob)
+  a.download = `${slug}-ai-briefing.md`
+  a.click()
+  URL.revokeObjectURL(a.href)
+  if (btnEl) {
+    const orig = origText ?? btnEl.textContent
+    btnEl.textContent = copied ? L('copied') : L('brief_saved')
+    setTimeout(() => { btnEl.textContent = orig }, 2000)
+  }
+}
+
 function briefingMd(seat, idx) {
   const bm = state.lang === 'bm'
   const L2 = (b, e) => (bm ? b : e)
@@ -760,6 +795,52 @@ async function renderHome() {
   }
   renderList()
   document.getElementById('seatSearch').addEventListener('input', (e) => renderList(e.target.value))
+  renderFooter(idx)
+}
+
+// ---- volunteer AI-briefing hub (muda edition only): find your seat, get an
+// AI briefing in one tap — no need to know a DUN code or dig through tabs ----
+async function renderVolunteer() {
+  const idx = await loadIndex()
+  if (idx.edition !== 'muda') { location.hash = '#/'; return }
+
+  app.innerHTML = `
+    <div class="crumbs"><a href="#/">← Johor</a></div>
+    <div class="card">
+      <h2>${L('volunteer_title')}</h2>
+      <p class="sub">${L('volunteer_sub')}</p>
+      <input class="searchbox" id="volSearch" placeholder="${L('search')}" autocomplete="off">
+      <div class="seat-list" id="volList"></div>
+    </div>`
+
+  const listEl = document.getElementById('volList')
+  const renderList = (q = '') => {
+    const needle = q.trim().toLowerCase()
+    const rows = idx.seats.filter(s =>
+      !needle || `${s.code} ${s.name} ${s.parlimen} ${s.kpdn_district}`.toLowerCase().includes(needle))
+    listEl.innerHTML = rows.length ? rows.map(s => `
+      <div class="seat-row">
+        <span class="left">
+          <span class="name">${esc(s.code)} ${esc(s.name)} ${s.featured ? '★' : ''}</span>
+          <span class="meta">${esc(s.parlimen ?? '')}</span>
+        </span>
+        <button class="btn" data-slug="${esc(s.slug)}">${L('volunteer_get_btn')}</button>
+      </div>`).join('') : `<p class="sub">${L('volunteer_none')}</p>`
+    listEl.querySelectorAll('button[data-slug]').forEach(btn => btn.addEventListener('click', async () => {
+      const slug = btn.dataset.slug
+      const orig = btn.textContent
+      btn.textContent = L('volunteer_loading')
+      btn.disabled = true
+      try {
+        const seat = await loadSeat(slug)
+        await copyAndDownloadBriefing(briefingMd(seat, idx), slug, btn, orig)
+      } finally {
+        btn.disabled = false
+      }
+    }))
+  }
+  renderList()
+  document.getElementById('volSearch').addEventListener('input', (e) => renderList(e.target.value))
   renderFooter(idx)
 }
 
@@ -1433,23 +1514,7 @@ async function renderSeat(slug, tab = 'brief') {
   })
 
   const briefBtn = document.getElementById('briefBtn')
-  if (briefBtn) briefBtn.addEventListener('click', async () => {
-    const md = briefingMd(seat, idx)
-    let copied = false
-    if (navigator.clipboard?.writeText) {
-      try { await navigator.clipboard.writeText(md); copied = true } catch { /* denied */ }
-    }
-    // always also download — easiest to forward to the field over WhatsApp
-    const blob = new Blob([md], { type: 'text/markdown' })
-    const a = document.createElement('a')
-    a.href = URL.createObjectURL(blob)
-    a.download = `${seat.slug}-ai-briefing.md`
-    a.click()
-    URL.revokeObjectURL(a.href)
-    const orig = briefBtn.textContent
-    briefBtn.textContent = copied ? L('copied') : L('brief_saved')
-    setTimeout(() => { briefBtn.textContent = orig }, 2000)
-  })
+  if (briefBtn) briefBtn.addEventListener('click', () => copyAndDownloadBriefing(briefingMd(seat, idx), seat.slug, briefBtn))
 
   renderFooter(idx)
   window.scrollTo(0, 0)
@@ -1461,6 +1526,7 @@ async function route() {
   try {
     const m = hash.match(/^#\/seat\/([a-z0-9-]+)(?:\/(brief|field|hq))?/)
     if (m) await renderSeat(m[1], m[2] ?? 'brief')
+    else if (hash === '#/volunteer') await renderVolunteer()
     else await renderHome()
   } catch (e) {
     console.error(e)
