@@ -79,6 +79,19 @@ try {
   issuesManual = JSON.parse(await readFile(path.join('data', 'manual', 'issues.json'), 'utf8'))
 } catch { log('no manual issues.json, skipping local issues') }
 
+// ---- curated national issues (research-verified, hand-maintained; neutral,
+// both editions — sourced facts like issues.json, surfaced app-wide) ----
+let nationalIssues = { issues: [] }
+try {
+  nationalIssues = JSON.parse(await readFile(path.join('data', 'manual', 'national_issues.json'), 'utf8'))
+} catch { log('no manual national_issues.json, skipping national issues') }
+
+// ---- government price ceilings (hand-maintained; neutral, both editions) ----
+let priceCeilings = { items: {} }
+try {
+  priceCeilings = JSON.parse(await readFile(path.join('data', 'manual', 'price_ceilings.json'), 'utf8'))
+} catch { log('no manual price_ceilings.json, skipping ceiling compliance') }
+
 // ---- pro-MUDA edition: curated national record (advocacy build only) ----
 let mudaRecord = null
 let mudaStances = null
@@ -153,6 +166,13 @@ const priceBlockFor = (seat) => {
     let since_se15 = null
     if (latest != null && aD) since_se15 = { perc: +(100 * (latest - aD) / aD).toFixed(1), then: aD, scope: 'district' }
     else if (latestJohor != null && aJ) since_se15 = { perc: +(100 * (latestJohor - aJ) / aJ).toFixed(1), then: aJ, scope: 'johor' }
+    // government price ceiling, for the 3 items that currently have one —
+    // compliance is checked against whichever scope the current price uses
+    // (district median where available, else Johor), so it compares like
+    // with like rather than mixing a district figure against a Johor ceiling
+    const ceil = priceCeilings.items?.[b.key] ?? null
+    const observed = latest ?? latestJohor
+    const ceiling = ceil ? { ...ceil, observed, exceeds_perc: observed != null ? +(100 * (observed - ceil.price) / ceil.price).toFixed(1) : null } : null
     return {
       code: b.code, key: b.key, label_bm: b.label_bm, label_en: b.label_en, item: b.item, unit: b.unit,
       latest_district: latest,
@@ -161,6 +181,7 @@ const priceBlockFor = (seat) => {
       change_4w_perc: latest != null && w4 ? +(100 * (latest - w4) / w4).toFixed(1) : null,
       change_12w_perc: latest != null && w12 ? +(100 * (latest - w12) / w12).toFixed(1) : null,
       since_se15,
+      ceiling,
       series: { district: dSeries, johor: s.johor, national: s.national },
     }
   })
@@ -325,6 +346,7 @@ const index = {
   fuel,
   cpi,
   edition: EDITION,
+  national_issues: nationalIssues.issues ?? [],
   johor_context: { crime, undi18, muda: mudaJohor },
   muda_record: mudaRecord,
   source_health: health,

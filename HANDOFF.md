@@ -41,31 +41,43 @@ no accounts, no env vars needed.
   assistant notes. The essential facts from them are reproduced in "Key context"
   below, so nothing important is lost.
 
-## Deploying the public app (private repo)
+## Deploying (live setup)
 
-The repo is **private** (it holds opposition research in `data/manual/issues.json`
-and turnout strategy in `tools/analyze_muda.mjs`). Free GitHub Pages does **not**
-serve private repos, so the chosen setup splits refresh and deploy:
+The repo is now **public**, and hosting runs on a git-connected **Cloudflare
+Worker** named `peta-muda` (Workers Builds; production branch `main`, build
+command none, deploy command `npx wrangler deploy`, config dashboard-side —
+there is no wrangler file in the repo).
 
-- **Refresh (data):** `.github/workflows/refresh.yml` runs the pipeline nightly
-  (cron `30 13 * * *` = 21:30 MYT) and commits the regenerated `site/data`. This
-  job is free on the private-repo Actions tier (~150 of 2,000 min/month). It does
-  **not** deploy — Cloudflare handles that.
-- **Deploy (hosting) — Cloudflare Pages (free, chosen):** connect the private
-  repo in the Cloudflare dashboard with **build command = _(none)_** and
-  **output directory = `site`** (the data is committed, so no build is needed —
-  Cloudflare just serves the static folder). Cloudflare auto-redeploys on every
-  push, so the nightly refresh commit triggers a fresh deploy. Free tier is 500
-  builds/month; a nightly deploy uses ~30. Keeps the repo private, no GitHub Pro.
-- **Alternatives:** GitHub Pages needs Pro ($4/mo) for a private repo (and Pages
-  must be enabled: Settings → Pages → Source: GitHub Actions). Or make the repo
-  public for free GitHub Pages — but that exposes the strategy source files.
-  Or skip hosting entirely and run `npm run serve` locally for internal use.
+- **Live URL: <https://peta-muda.jamesyeang.workers.dev>** — deployed on every
+  push to `main` (including the data bot's own commits, so data refreshes go
+  live automatically).
+- **The deployed build is the MUDA edition** (`EDITION: muda` in
+  `refresh.yml`'s pipeline step): the team-facing version with the volunteer
+  AI-briefing hub, MUDA record/stance cards, and briefing export. Remove that
+  env to publish the neutral public edition instead.
+- **Refresh (data):** `.github/workflows/refresh.yml` runs the pipeline and
+  commits the regenerated `site/data` on three triggers: nightly cron
+  (`30 13 * * *` = 21:30 MYT, after PriceCatcher's daily update), manual
+  dispatch, and **any push to `main` touching `pipeline/**` or
+  `data/manual/**`** — so a merged content/curation change rebuilds and goes
+  live without a manual step. The bot commit only touches `site/data` (outside
+  the paths filter), so it never re-triggers itself.
+- **Daily curated refresh:** a scheduled Claude session (06:00 MYT daily) sweeps
+  the last ~48h of news, updates the hand-curated files (`data/manual/
+  issues.json`, `national_issues.json`, `muda_stances.json`,
+  `price_ceilings.json`, `muda_record.json`) under the strict sourcing rules,
+  runs both edition sim suites, and pushes to `main` only when green — keeping
+  the curated content current without manual upkeep.
 
-⚠️ Two caveats:
-- The deployed *site* exposes the Field/Analysis tabs (doorstep lines, turnout
-  strategy) to anyone with the URL. To keep it internal, put Cloudflare Access
-  (free) in front of the Pages project, or only serve locally.
+⚠️ Caveats:
+- The live site exposes the Field tabs and MUDA advocacy layer to anyone with
+  the URL (unlisted, but public). To gate it to the team, put **Cloudflare
+  Access** (free, email allowlist) in front of the workers.dev route —
+  dashboard: Worker → Settings → Domains & Routes.
+- Workers Builds' "version command" is currently `npx wrangler deploy`, which
+  means **branch pushes also deploy to production**. Changing it to
+  `npx wrangler versions upload` (dashboard → Settings → Build) turns branch
+  builds into true preview URLs instead.
 - GitHub **disables scheduled workflows after 60 days of no repo activity** (the
   bot's own nightly commits do **not** reset this timer). If the repo goes quiet
   for 60 days the refresh cron silently pauses until someone pushes or re-enables
@@ -183,7 +195,9 @@ pro-MUDA advocacy layer ("small party, big bite"):
   founded 2020); "~5.8M newly-registered", never "young voters"; anti-hopping =
   advocacy, not authorship. `npm run sim` (and `EDITION=muda npm run sim`) assert
   the gating + the guardrail + the Undi18 cross-check.
-- **Deploy:** a 2nd Cloudflare Pages project on this repo with build env
-  `EDITION=muda`, gated to a few people via **Cloudflare Access** (Zero Trust →
-  Access → self-hosted app → email allowlist, free ≤50). `main`'s neutral project
-  is untouched. Note: the curated `muda_record.json` still sits in the public repo.
+- **Deploy:** the live site IS the muda edition (see "Deploying" above) —
+  `refresh.yml` bakes `EDITION=muda` data on every refresh, and the single
+  Cloudflare Worker serves it. The neutral edition remains one env-var flip away
+  (remove `EDITION: muda` from `refresh.yml`), or add a second Worker later if
+  both editions must be live at once. Optional team-gating via **Cloudflare
+  Access** (Zero Trust → Access → email allowlist, free ≤50).

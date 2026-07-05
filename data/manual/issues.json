@@ -1,9 +1,10 @@
 {
-  "_comment": "Curated local doorstep issues. Every entry survived an adversarial fact-check (one hostile verifier per issue re-fetching all sources); corrections were applied to the wording. Edit freely; re-run the pipeline after edits.",
+  "_comment": "Curated local doorstep issues. Every entry survived an adversarial fact-check (one hostile verifier per issue re-fetching all sources); corrections were applied to the wording. Edit freely; re-run the pipeline after edits. Each issue carries a theme key mapping to a muda_stances.json theme so the MUDA angle can be overlaid in the muda edition.",
   "updated": "2026-07-03",
   "seats": {
     "N.41": [
       {
+        "theme": "floods",
         "issue_bm": "Banjir kilat asyik melanda Johor Bahru — Mac 2025 lebih 13,000 orang dipindahkan dan daerah JB paling teruk terjejas, kemudian 12 Disember 2025 hujan sejam lebih saja sudah memerangkap 18 bayi di tadika Kampung Mohd Amin, tadika sama yang dinaiki air Disember 2023 — walaupun kerajaan sudah umumkan RM1.45 bilion tebatan banjir Johor dan RM142.7 juta khas untuk hotspot JB.",
         "issue_en": "Flash floods keep hitting Johor Bahru — over 13,000 people were evacuated in March 2025 with JB the worst-hit district, then on 12 December 2025 barely an hour of heavy rain trapped 18 babies in a Kampung Mohd Amin kindergarten, the same kampung flooded in December 2023 — despite the government announcing RM1.45 billion for Johor flood mitigation and RM142.7 million specifically for JB hotspots.",
         "receipt_bm": "12 Dis 2025: 18 bayi dan 10 kanak-kanak antara 34 diselamatkan bomba dari tadika dinaiki air di Kampung Mohd Amin, Johor Bahru (FMT). Mac 2025: 11,794 mangsa banjir Johor setakat 21 Mac, daerah JB paling teruk dengan 4,384 (RTM rasmi). Janji sedia ada: RM1.45 bilion tebatan banjir Johor (diumum Sep 2024) + RM142.7 juta untuk 7 projek hotspot JB (Mei 2025) — projek terbesar, PLSB Sungai Skudai RM99.8 juta, masih di peringkat lantikan perunding.",
@@ -17,6 +18,7 @@
         "verdict": "PARTLY_CONFIRMED"
       },
       {
+        "theme": "water",
         "issue_bm": "Tiga kali dalam setahun air kita terputus — Mei 2025 empat hari tanpa air bila enam pam LRA Sungai Johor rosak, Julai 2025 catuan 26 jam di JB dan Tebrau, dan 21-22 April lepas 23 jam lagi termasuk kawasan Tiram — semuanya bawah konsesi air kerajaan negeri.",
         "issue_en": "Three times in twelve months our taps went dry — four days in May 2025 when all six pumps at the Sungai Johor treatment plant failed, a 26-hour cut in July 2025 across JB and Tebrau, and another 23 hours this past 21-22 April covering Tiram — all under the state government's water concession.",
         "receipt_bm": "21-22 April 2026: gangguan air terancang 23 jam oleh Ranhill SAJ (penyelenggaraan LRA Sungai Johor) meliputi kawasan Tiram, Skudai, Bukit Indah, Iskandar Puteri, Kota Tinggi dan Pontian; sebelum itu 20-24 Mei 2025 kira-kira 100,000 akaun terputus bekalan selepas enam pam air mentah LRA Sungai Johor rosak.",
@@ -30,6 +32,7 @@
         "verdict": "PARTLY_CONFIRMED"
       },
       {
+        "theme": "traffic",
         "issue_bm": "Koridor Tebrau sesak kronik — calon PH sendiri, Maszlee, mengaku Kangkar Tebrau dan Kampung Maju Jaya sesak teruk — tetapi RTS hanya beroperasi Januari 2027 di Bukit Chagar, dan sehingga kini masih tiada perkhidmatan pengantara yang disahkan untuk penduduk Ulu Tiram dan Mount Austin.",
         "issue_en": "The Tebrau corridor is chronically jammed — PH's own candidate Maszlee admits Kangkar Tebrau and Kampung Maju Jaya are congestion blackspots — yet the RTS only opens in January 2027 at Bukit Chagar, and to this day there is still no confirmed feeder service for Ulu Tiram and Mount Austin residents.",
         "receipt_bm": "30 Jun 2026 (Bernama): Maszlee namakan Kangkar Tebrau & Kampung Maju Jaya sebagai kawasan sesak; 350,000 pengembara guna Tambak Johor setiap hari; MRT Corp sendiri unjurkan RTS (buka Januari 2027 di Bukit Chagar) serap 35% trafik — tetapi setakat 7 Mei 2026 (FMT) pelan pengantara masih kabur, cadangan APM RM7 bilion baru di peringkat surat hasrat.",
@@ -45,6 +48,7 @@
     ],
     "N.13": [
       {
+        "theme": "furniture",
         "issue_bm": "Perabot Muar — kira-kira 800 kilang yang menghasilkan 55-60% eksport perabot negara — kini dihimpit tarif Trump 25% sejak 14 Oktober 2025, dijadual naik ke 30% pada 1 Januari 2027, sementara kos gaji minimum, KWSP pekerja asing dan elektrik terus naik; tiada pelan khas pun dari Putrajaya atau Johor untuk selamatkan periuk nasi Muar.",
         "issue_en": "Muar's furniture industry — about 800 factories producing 55-60% of Malaysia's furniture exports — has been squeezed by Trump's 25% tariff since 14 October 2025, scheduled to rise to 30% on 1 January 2027, while minimum wage, foreign-worker EPF and electricity costs keep climbing; yet neither Putrajaya nor Johor has a rescue plan for Muar's rice bowl.",
         "receipt_bm": "Sejak 14 Oktober 2025 AS mengenakan tarif 25% ke atas perabot upholsteri; kenaikan ke 30% ditangguh pada 31 Disember 2025 ke 1 Januari 2027. Muar: ~800 kilang, 55-60% eksport perabot Malaysia, 7,000-8,000 kontena sebulan (angka Persatuan Perabot Muar); AS ialah pasaran terbesar — hampir separuh eksport perabot negara (RM6.05 bilion daripada RM12.83 bilion, 2024).",
@@ -58,6 +62,7 @@
         "verdict": "PARTLY_CONFIRMED"
       },
       {
+        "theme": "allocation",
         "issue_bm": "Selepas MUDA jadi pembangkang pada September 2023, kerajaan pusat tahan RM500,000 duit kebajikan Muar, batal projek yang dah diluluskan bernilai RM230,300, dan bila akhirnya beri RM200,000 pada Julai 2025, duit itu langsung tak boleh diguna untuk bantu rakyat.",
         "issue_en": "After MUDA went into opposition in September 2023, the federal government withheld RM500,000 of Muar's welfare money, cancelled RM230,300 in already-approved projects, and when it finally released RM200,000 in July 2025, that money could not be used to help residents at all.",
         "receipt_bm": "21 Julai 2025: Parlimen Muar terima hanya RM200,000 selepas lebih 500 hari rundingan — terhad kepada sewa pejabat dan gaji staf sahaja; pada 10 Mac 2026 Mahkamah Persekutuan benarkan rayuan Syed Saddiq mengenai RM500,000 yang ditahan dan projek RM230,300 yang dibatalkan.",
@@ -71,6 +76,7 @@
         "verdict": "CONFIRMED"
       },
       {
+        "theme": "floods",
         "issue_bm": "Muar asyik dilanda banjir — 2,829 mangsa dipindahkan pada Mac 2023 dan Bomba senaraikan 87 lokasi berisiko banjir di Muar — tetapi projek tebatan banjir Sungai Muar RM559 juta hanya siap Julai 2029, dan ia melindungi 22,000 penduduk Segamat, bukan bandar Muar. Siapa jaga rumah anda monsun depan?",
         "issue_en": "Muar keeps flooding — 2,829 residents evacuated in March 2023 and Bomba lists 87 flood-risk spots in Muar — yet the RM559 million Sungai Muar mitigation project only finishes in July 2029, and it protects 22,000 Segamat residents, not Muar town. Who protects your house next monsoon?",
         "receipt_bm": "The Star, 1 Mei 2026: RTB Sungai Muar Fasa 3 Pakej 1 (RM559 juta, 25km) baru melepasi 35% siap, dijangka siap Julai 2029 — manfaatnya untuk 22,000 penduduk Segamat. Sinar Harian, 3 Mac 2023: 2,829 mangsa banjir di daerah Muar, 33,149 di seluruh Johor.",
@@ -86,6 +92,7 @@
     ],
     "N.15": [
       {
+        "theme": "furniture",
         "issue_bm": "Perabot Muar — kira-kira 800 kilang yang menghasilkan 55-60% eksport perabot negara — kini dihimpit tarif Trump 25% sejak 14 Oktober 2025, dijadual naik ke 30% pada 1 Januari 2027, sementara kos gaji minimum, KWSP pekerja asing dan elektrik terus naik; tiada pelan khas pun dari Putrajaya atau Johor untuk selamatkan periuk nasi Muar.",
         "issue_en": "Muar's furniture industry — about 800 factories producing 55-60% of Malaysia's furniture exports — has been squeezed by Trump's 25% tariff since 14 October 2025, scheduled to rise to 30% on 1 January 2027, while minimum wage, foreign-worker EPF and electricity costs keep climbing; yet neither Putrajaya nor Johor has a rescue plan for Muar's rice bowl.",
         "receipt_bm": "Sejak 14 Oktober 2025 AS mengenakan tarif 25% ke atas perabot upholsteri; kenaikan ke 30% ditangguh pada 31 Disember 2025 ke 1 Januari 2027. Muar: ~800 kilang, 55-60% eksport perabot Malaysia, 7,000-8,000 kontena sebulan (angka Persatuan Perabot Muar); AS ialah pasaran terbesar — hampir separuh eksport perabot negara (RM6.05 bilion daripada RM12.83 bilion, 2024).",
@@ -99,6 +106,7 @@
         "verdict": "PARTLY_CONFIRMED"
       },
       {
+        "theme": "allocation",
         "issue_bm": "Selepas MUDA jadi pembangkang pada September 2023, kerajaan pusat tahan RM500,000 duit kebajikan Muar, batal projek yang dah diluluskan bernilai RM230,300, dan bila akhirnya beri RM200,000 pada Julai 2025, duit itu langsung tak boleh diguna untuk bantu rakyat.",
         "issue_en": "After MUDA went into opposition in September 2023, the federal government withheld RM500,000 of Muar's welfare money, cancelled RM230,300 in already-approved projects, and when it finally released RM200,000 in July 2025, that money could not be used to help residents at all.",
         "receipt_bm": "21 Julai 2025: Parlimen Muar terima hanya RM200,000 selepas lebih 500 hari rundingan — terhad kepada sewa pejabat dan gaji staf sahaja; pada 10 Mac 2026 Mahkamah Persekutuan benarkan rayuan Syed Saddiq mengenai RM500,000 yang ditahan dan projek RM230,300 yang dibatalkan.",
@@ -112,6 +120,7 @@
         "verdict": "CONFIRMED"
       },
       {
+        "theme": "floods",
         "issue_bm": "Muar asyik dilanda banjir — 2,829 mangsa dipindahkan pada Mac 2023 dan Bomba senaraikan 87 lokasi berisiko banjir di Muar — tetapi projek tebatan banjir Sungai Muar RM559 juta hanya siap Julai 2029, dan ia melindungi 22,000 penduduk Segamat, bukan bandar Muar. Siapa jaga rumah anda monsun depan?",
         "issue_en": "Muar keeps flooding — 2,829 residents evacuated in March 2023 and Bomba lists 87 flood-risk spots in Muar — yet the RM559 million Sungai Muar mitigation project only finishes in July 2029, and it protects 22,000 Segamat residents, not Muar town. Who protects your house next monsoon?",
         "receipt_bm": "The Star, 1 Mei 2026: RTB Sungai Muar Fasa 3 Pakej 1 (RM559 juta, 25km) baru melepasi 35% siap, dijangka siap Julai 2029 — manfaatnya untuk 22,000 penduduk Segamat. Sinar Harian, 3 Mac 2023: 2,829 mangsa banjir di daerah Muar, 33,149 di seluruh Johor.",
@@ -127,6 +136,7 @@
     ],
     "N.51": [
       {
+        "theme": "water",
         "issue_bm": "Ingat krisis air November lepas? Kolam basuhan lombong pasir pecah dan cemari Sungai Johor — 455,499 akaun air di JB, Kulai dan Kota Tinggi kering berhari-hari, exco negeri sendiri akui ia pencemaran sumber air terburuk pernah direkodkan, dan pada 21 April lepas paip kita kering lagi 23 jam.",
         "issue_en": "Remember last November's water crisis? A sand-mine washing pond burst and polluted Sungai Johor — 455,499 water accounts across JB, Kulai and Kota Tinggi went dry for days, the state exco himself admitted it was the worst water-source pollution ever recorded, and this past 21 April our taps went dry again for 23 hours.",
         "receipt_bm": "31 Okt 2025: kekeruhan Sungai Johor melonjak ke 37,400 NTU (paras biasa ~400), 4 loji rawatan ditutup, 455,499 akaun terjejas (exco: ~1.2 juta pengguna) di JB, Kota Tinggi dan Kulai; hanya 448,057 akaun pulih menjelang 7 malam 3 Nov — Kulai antara yang terakhir. 21-22 Apr 2026: gangguan berjadual 23 jam lagi, meliputi Skudai dan Tiram.",
@@ -140,6 +150,7 @@
         "verdict": "PARTLY_CONFIRMED"
       },
       {
+        "theme": "floods",
         "issue_bm": "Kulai dilanda banjir dua kali dalam tiga bulan pertama 2025 — 764 mangsa dipindahkan ke PPS pada Januari dan 269 lagi pada Mac — tetapi projek tebatan banjir RM2.6 bilion untuk Johor hanya dijanjikan siap menjelang 2027, maksudnya penduduk disuruh tunggu dua musim tengkujuh lagi.",
         "issue_en": "Kulai flooded twice in the first three months of 2025 — 764 people evacuated to relief centres in January and another 269 in March — yet Johor's RM2.6 billion flood-mitigation projects are only promised for completion by 2027, meaning residents are told to wait through two more monsoons.",
         "receipt_bm": "13 Jan 2025: 764 mangsa (191 keluarga) di 5 PPS di Kulai, termasuk PPS Kampung Murni Jaya; 20 Mac 2025: 269 mangsa (76 keluarga) di 2 PPS di Kulai, Sungai Siam melepasi paras bahaya; Nov 2025: Exco Kerja Raya Johor umum 15 projek RTB bernilai RM2.6 bilion dijangka siap menjelang 2027.",
@@ -153,6 +164,7 @@
         "verdict": "PARTLY_CONFIRMED"
       },
       {
+        "theme": "floods",
         "issue_bm": "Segamat banjir lagi pada 28 Disember 2025 — 103 penduduk dipindahkan ke enam PPS dan Sungai Muar melepasi paras bahaya — sedangkan projek tebatan banjir RM1.6 bilion yang dijanjikan selepas banjir besar 2022/23 masih belum siap sehingga 2027, dan kontraktor asal projek lencongan Tanjung Olak gagal sehingga terpaksa diganti.",
         "issue_en": "Segamat flooded yet again on 28 December 2025 — 103 residents evacuated to six relief centres with Sungai Muar past danger level — while the RM1.6 billion flood-mitigation projects promised after the 2022/23 disaster floods won't be finished until 2027, and the original contractor on the Tanjung Olak bypass failed and had to be replaced.",
         "receipt_bm": "28 Dis 2025: 103 mangsa banjir di 6 PPS di Segamat; Sungai Muar di Kg Awat catat 20m melepasi paras bahaya (Bernama). Mac 2025: 10,763 dipindahkan seluruh Johor (JB 4,291; Kulai 1,152). Projek RTB RM1.6 bilion (janji April 2024) hanya siap 2027.",
@@ -168,6 +180,7 @@
     ],
     "N.48": [
       {
+        "theme": "water",
         "issue_bm": "Ingat krisis air November lepas? Kolam basuhan lombong pasir pecah dan cemari Sungai Johor — 455,499 akaun air di JB, Kulai dan Kota Tinggi kering berhari-hari, exco negeri sendiri akui ia pencemaran sumber air terburuk pernah direkodkan, dan pada 21 April lepas paip kita kering lagi 23 jam.",
         "issue_en": "Remember last November's water crisis? A sand-mine washing pond burst and polluted Sungai Johor — 455,499 water accounts across JB, Kulai and Kota Tinggi went dry for days, the state exco himself admitted it was the worst water-source pollution ever recorded, and this past 21 April our taps went dry again for 23 hours.",
         "receipt_bm": "31 Okt 2025: kekeruhan Sungai Johor melonjak ke 37,400 NTU (paras biasa ~400), 4 loji rawatan ditutup, 455,499 akaun terjejas (exco: ~1.2 juta pengguna) di JB, Kota Tinggi dan Kulai; hanya 448,057 akaun pulih menjelang 7 malam 3 Nov — Kulai antara yang terakhir. 21-22 Apr 2026: gangguan berjadual 23 jam lagi, meliputi Skudai dan Tiram.",
@@ -181,6 +194,7 @@
         "verdict": "PARTLY_CONFIRMED"
       },
       {
+        "theme": "water",
         "issue_bm": "Januari 2025, air hitam berbuih berbau bangkai mengalir masuk Sungai Skudai di Kampung Sepakat Baru hampir dua minggu — Jabatan Alam Sekitar Johor sendiri kata loji kumbahan berdekatan 'trip' dan kumbahan mentah disyaki terlepas ke sungai kita; sampai hari ini, siapa yang didenda?",
         "issue_en": "In January 2025, black, foaming water stinking of carcasses flowed into Sungai Skudai at Kampung Sepakat Baru for nearly two weeks — Johor's own Department of Environment said a nearby sewage plant tripped and raw sewage was suspected of escaping into our river; to this day, who has been fined?",
         "receipt_bm": "10-11 Januari 2025: Pengarah JAS Johor Dr Mohd Famey Yusoff mengesahkan loji rawatan kumbahan berhampiran Kampung Sepakat Baru, Skudai mengalami 'trip' bekalan elektrik dan pelepasan kumbahan mentah mungkin berlaku; penduduk lapor air hitam berbuih berbau bangkai mengalir ke Sungai Skudai sejak akhir Disember 2024.",
@@ -194,6 +208,7 @@
         "verdict": "PARTLY_CONFIRMED"
       },
       {
+        "theme": "floods",
         "issue_bm": "Segamat banjir lagi pada 28 Disember 2025 — 103 penduduk dipindahkan ke enam PPS dan Sungai Muar melepasi paras bahaya — sedangkan projek tebatan banjir RM1.6 bilion yang dijanjikan selepas banjir besar 2022/23 masih belum siap sehingga 2027, dan kontraktor asal projek lencongan Tanjung Olak gagal sehingga terpaksa diganti.",
         "issue_en": "Segamat flooded yet again on 28 December 2025 — 103 residents evacuated to six relief centres with Sungai Muar past danger level — while the RM1.6 billion flood-mitigation projects promised after the 2022/23 disaster floods won't be finished until 2027, and the original contractor on the Tanjung Olak bypass failed and had to be replaced.",
         "receipt_bm": "28 Dis 2025: 103 mangsa banjir di 6 PPS di Segamat; Sungai Muar di Kg Awat catat 20m melepasi paras bahaya (Bernama). Mac 2025: 10,763 dipindahkan seluruh Johor (JB 4,291; Kulai 1,152). Projek RTB RM1.6 bilion (janji April 2024) hanya siap 2027.",
@@ -210,6 +225,7 @@
   },
   "statewide": [
     {
+      "theme": "housing",
       "issue_bm": "Sejak JS-SEZ dimeterai Januari 2025, harga apartmen servis di Johor Bahru melonjak 20.4% dalam setahun — anak muda Puteri Wangsa bergaji ringgit terpaksa bersaing dengan permintaan pelabur rentas sempadan untuk rumah pertama, sampai calon PH sendiri mengaku harga rumah tinggi untuk golongan muda adalah masalah utama di sini.",
       "issue_en": "Since the JS-SEZ was signed in January 2025, Johor Bahru serviced-apartment prices have jumped 20.4% in a single year — young Puteri Wangsa workers earning ringgit are competing with cross-border investor demand for their first home, and even the PH candidate admits high house prices for the young are a top problem here.",
       "receipt_bm": "17 Julai 2025: FMT lapor data JLL Malaysia — harga apartmen servis Johor Bahru naik 20.4% setahun pada S2 2025 (teres dua tingkat +8.6%), didorong momentum JS-SEZ; 30 Jun 2026: Bernama lapor harga rumah tinggi bagi golongan muda antara isu utama di Puteri Wangsa.",
@@ -222,6 +238,7 @@
       "verdict": "PARTLY_CONFIRMED"
     },
     {
+      "theme": "wages",
       "issue_bm": "Setahun selepas MB umum pelabur JS-SEZ setuju bayar \"gaji premium\" RM3,500, calon PH Puteri Wangsa sendiri mengaku remaja kita masih cicir sekolah untuk kerja gig atau kerja kasar di Singapura sebab bayarannya tiga kali ganda — dan dia akui kerajaan negeri sahaja tak mampu selesaikannya.",
       "issue_en": "A year after the MB announced JS-SEZ investors agreed to pay RM3,500 \"premium salaries\", PH's own Puteri Wangsa candidate admits local teens are still dropping out of school for gig work or manual jobs in Singapore paying triple — and that the state government alone cannot fix it.",
       "receipt_bm": "30 Jun 2026 (Bernama): Maszlee sebut keciciran pelajaran remaja di Puteri Wangsa dan gaji kerja kasar Singapura \"tiga kali ganda\"; 20 Mei 2025 (Sinar Harian): Onn Hafiz umum pelabur JS-SEZ setuju gaji minimum RM3,500 (diploma) / RM4,000+ (ijazah), bersyarat produktiviti dan kemahiran.",
@@ -234,6 +251,7 @@
       "verdict": "PARTLY_CONFIRMED"
     },
     {
+      "theme": "wages",
       "issue_bm": "Anak muda Muar terpaksa lari ke Singapura sebab gaji di sana tiga kali ganda — 16,930 rakyat Malaysia melepaskan kewarganegaraan pada 2024 sahaja dan lebih 350,000 berulang-alik setiap hari — sedangkan \"gaji premium dari RM3,500\" yang dijanjikan MB semuanya dalam zon JS-SEZ di selatan Johor, 150km dari Muar.",
       "issue_en": "Muar's young people are forced out to Singapore because pay there is roughly triple — 16,930 Malaysians gave up their citizenship in 2024 alone and over 350,000 commute daily — while the MB's promised \"premium salaries from RM3,500\" all sit in JS-SEZ zones in southern Johor, 150km from Muar.",
       "receipt_bm": "Jawapan Parlimen KDN, 11 Ogos 2025: 97,318 rakyat Malaysia jadi warga Singapura 2015–Jun 2025, rekod 16,930 pada 2024; lebih 350,000 ulang-alik ke Singapura setiap hari; janji MB \"gaji premium dari RM3,500\" (Mei 2025) terikat pada 9 zon utama JS-SEZ — kesemuanya di selatan Johor, tiada satu pun di Muar.",

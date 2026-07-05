@@ -66,11 +66,22 @@ export const BASKET = [
   { key: 'ayam', label_bm: 'Ayam bersih', label_en: 'Chicken (whole, cleaned)', patterns: [/^AYAM BERSIH - STANDARD/] },
   { key: 'telur', label_bm: 'Telur ayam', label_en: 'Eggs', patterns: [/^TELUR AYAM.*GRED A\b/, /^TELUR AYAM.*GRED B\b/, /^TELUR AYAM.*GRED C\b/] },
   { key: 'ikan', label_bm: 'Ikan kembung', label_en: 'Mackerel (kembung)', patterns: [/^IKAN KEMBUNG/] },
-  { key: 'beras', label_bm: 'Beras tempatan', label_en: 'Local white rice', patterns: [/^BERAS.*TEMPATAN/, /^BERAS/] },
+  // Fallback excludes anything explicitly labelled IMPORT: without this, a
+  // widely-stocked imported branded rice (e.g. "BERAS SUPER CAP RAMBUTAN
+  // (IMPORT)") can win on premise coverage while the category is still
+  // labelled "local" — misrepresenting an imported SKU as the subsidised
+  // local staple (RM2.60/kg ceiling item).
+  { key: 'beras', label_bm: 'Beras tempatan', label_en: 'Local white rice', patterns: [/^BERAS.*TEMPATAN/, /^BERAS(?!.*IMPORT)/] },
   { key: 'minyak', label_bm: 'Minyak masak', label_en: 'Cooking oil', patterns: [/^MINYAK MASAK.*PAKET/, /^MINYAK MASAK/] },
   { key: 'gula', label_bm: 'Gula putih', label_en: 'White sugar', patterns: [/^GULA PUTIH BERTAPIS KASAR/, /^GULA PUTIH/] },
   { key: 'tepung', label_bm: 'Tepung gandum', label_en: 'Wheat flour', patterns: [/^TEPUNG GANDUM/] },
   { key: 'bawang', label_bm: 'Bawang merah', label_en: 'Red onions', patterns: [/^BAWANG MERAH.*INDIA/, /^BAWANG MERAH/, /^BAWANG BESAR/] },
+  // Provisional pattern — pending a real-data probe (dispatched refresh-data
+  // run) to confirm KPDN's exact lookup_item naming for garlic. Malaysia's
+  // garlic supply is almost entirely imported (mainly China), so the item
+  // string may carry an origin suffix similar to the onion entries above;
+  // this pattern is intentionally broad and will be tightened once verified.
+  { key: 'bawang_putih', label_bm: 'Bawang putih', label_en: 'Garlic', patterns: [/^BAWANG PUTIH/] },
   { key: 'cili', label_bm: 'Cili merah', label_en: 'Red chillies', patterns: [/^CILI MERAH/] },
   { key: 'sayur', label_bm: 'Sayur hijau', label_en: 'Leafy greens', patterns: [/^SAWI/, /^KANGKUNG/, /^BAYAM/] },
   { key: 'tomato', label_bm: 'Tomato', label_en: 'Tomatoes', patterns: [/^TOMATO/] },

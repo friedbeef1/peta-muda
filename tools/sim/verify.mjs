@@ -23,6 +23,10 @@ const normalizeSeat = (s) => {
   // it in the pending-fidelity baseline (real rebuilds populate it everywhere)
   if (c.election2026) delete c.election2026.result_date
   delete c.muda_stances // new edition-gated field; committed data predates it
+  // theme keys on curated issues are new metadata; committed data predates them
+  if (c.local_issues) {
+    for (const it of [...(c.local_issues.seat ?? []), ...(c.local_issues.statewide ?? [])]) delete it.theme
+  }
   if (c.election2026?.ballot) for (const b of c.election2026.ballot) b.career = b.career ? '<career>' : null
   if (c.saluran2022) for (const dm of c.saluran2022.dms) dm.turnout_perc = dm.turnout_perc == null ? null : Math.round(dm.turnout_perc)
   c.bbox = c.bbox ? c.bbox.map(v => Math.round(v * 10) / 10) : null
@@ -112,6 +116,19 @@ export async function verifyScenario(scenario, simDataDir, committedDataDir) {
     } else {
       ok(sim.index.muda_record == null, 'neutral edition must omit muda_record')
       ok(jc.muda == null, 'neutral edition must omit johor_context.muda')
+    }
+    // national issues: neutral metadata, both editions — every entry themed,
+    // bilingual and sourced; in the muda build every theme must resolve to a
+    // stance so the doorstep beat can always overlay a MUDA angle
+    const ni = sim.index.national_issues ?? []
+    ok(ni.length >= 3, `national_issues too small (${ni.length})`)
+    for (const it of ni) {
+      ok(!!(it.theme && it.issue_bm && it.issue_en && it.sources?.length && it.verdict), 'national issue missing theme/text/sources/verdict')
+    }
+    if (sim.index.edition === 'muda') {
+      const anySeat = sim.seats[codes[0]]
+      const stanceKeys = new Set((anySeat.muda_stances ?? []).map(t => t.key))
+      for (const it of ni) ok(stanceKeys.has(it.theme), `national issue theme '${it.theme}' has no statewide muda_stances entry`)
     }
     // stance layer: neutral seats carry null; muda seats carry arrays whose
     // every quote is attributed AND sourced (no unsourced quotes, ever)

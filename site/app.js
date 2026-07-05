@@ -58,6 +58,25 @@ const STR = {
     brief_btn: '🤖 Briefing AI (untuk ChatGPT/Gemini)',
     brief_saved: 'Fail .md dimuat turun!',
     stances_sub: 'Pendirian bersumber — sahkan sebelum menerbitkan bahan kempen',
+    volunteer_nav: '🤖 Briefing AI untuk sukarelawan →',
+    volunteer_title: 'Briefing AI untuk sukarelawan',
+    volunteer_sub: 'Cari kerusi anda, dapatkan briefing AI dalam satu ketikan — sedia untuk ditampal terus ke ChatGPT/Gemini.',
+    volunteer_get_btn: '🤖 Dapatkan briefing AI',
+    volunteer_loading: 'Menjana…',
+    volunteer_none: 'Tiada kerusi sepadan.',
+    volunteer_copied: (seat) => `✓ Briefing ${seat} disalin ke papan keratan`,
+    volunteer_cta_sub: 'Buka chat BARU, kemudian tampal (Cmd/Ctrl+V):',
+    volunteer_open_chatgpt: 'Buka ChatGPT',
+    volunteer_open_gemini: 'Buka Gemini',
+    ceiling_title: 'Pematuhan harga siling kerajaan',
+    ceiling_sub: 'Harga sebenar berbanding harga siling rasmi bagi 3 barangan terkawal',
+    ceiling_observed: 'Harga tempatan',
+    ceiling_official: 'Siling rasmi',
+    ceiling_status: 'Status',
+    ceiling_ok: 'Dalam siling',
+    ceiling_no_data: 'Tiada data',
+    ceiling_exceeds: (p) => `+${p}% melebihi`,
+    ceiling_note: 'Harga siling ditetapkan kerajaan (bukan data KPDN PriceCatcher) — disahkan secara manual, sahkan sebelum menerbitkan.',
     crime_title: 'Jenayah di Johor',
     crime_sub: 'Jenayah indeks berdaftar mengikut daerah polis',
     crime_note: 'Data PDRM peringkat daerah polis (bukan kerusi). Sahkan sebelum menerbitkan.',
@@ -94,6 +113,9 @@ const STR = {
     beat_message: 'Mesej di pintu',
     beat_ground: 'Peta lapangan',
     beat_ask: 'Tindakan',
+    beat_local: 'Tempatan',
+    beat_national: 'Nasional',
+    issues_national: 'Nasional',
     issues_title: 'Isu tempatan (disahkan sumber)',
     issues_sub: 'Isu khusus kawasan ini, disemak terhadap laporan berita — nombor rujukan boleh diklik',
     issues_statewide: 'Seluruh Johor',
@@ -175,6 +197,25 @@ const STR = {
     brief_btn: '🤖 AI briefing (for ChatGPT/Gemini)',
     brief_saved: '.md file downloaded!',
     stances_sub: 'Sourced positions — verify before publishing campaign material',
+    volunteer_nav: '🤖 Volunteer AI briefings →',
+    volunteer_title: 'Volunteer AI briefings',
+    volunteer_sub: 'Find your seat, get an AI briefing in one tap — ready to paste straight into ChatGPT/Gemini.',
+    volunteer_get_btn: '🤖 Get my AI briefing',
+    volunteer_loading: 'Generating…',
+    volunteer_none: 'No matching seats.',
+    volunteer_copied: (seat) => `✓ ${seat} briefing copied to clipboard`,
+    volunteer_cta_sub: 'Open a NEW chat, then paste it in (Cmd/Ctrl+V):',
+    volunteer_open_chatgpt: 'Open ChatGPT',
+    volunteer_open_gemini: 'Open Gemini',
+    ceiling_title: 'Government price-ceiling compliance',
+    ceiling_sub: 'Local observed price vs. the official ceiling for the 3 controlled items',
+    ceiling_observed: 'Local price',
+    ceiling_official: 'Official ceiling',
+    ceiling_status: 'Status',
+    ceiling_ok: 'Within ceiling',
+    ceiling_no_data: 'No data',
+    ceiling_exceeds: (p) => `+${p}% over`,
+    ceiling_note: 'Ceiling prices are government-set (not KPDN PriceCatcher data) — manually verified, verify before publishing.',
     crime_title: 'Crime in Johor',
     crime_sub: 'Registered index crime by police district',
     crime_note: 'PDRM data at police-district level (not per seat). Verify before publishing.',
@@ -211,6 +252,9 @@ const STR = {
     beat_message: 'The doorstep message',
     beat_ground: 'The ground map',
     beat_ask: 'The ask',
+    beat_local: 'Local',
+    beat_national: 'National',
+    issues_national: 'National',
     issues_title: 'Local issues (source-verified)',
     issues_sub: 'Issues specific to this area, checked against news reporting — reference numbers are clickable',
     issues_statewide: 'Johor-wide',
@@ -446,6 +490,7 @@ function mudaHomeCard(idx) {
     ${sub ? `<p class="sub">${esc(sub)}</p>` : ''}
     ${stats.length ? `<div style="display:flex;gap:1.2rem;flex-wrap:wrap;margin:.6rem 0 .2rem">${stats.join('')}</div>` : ''}
     ${rec ? `<h3>${L('muda_record_title')}</h3><ul class="points">${mudaRecordList(rec)}</ul>` : ''}
+    <div class="btn-row"><a class="btn secondary" href="#/volunteer">${L('volunteer_nav')}</a></div>
   </div>`
 }
 
@@ -458,6 +503,45 @@ function mudaHomeCard(idx) {
 // the data where related, listed separately ("OF NOTE") where not.
 // Edition-aware by construction: includes muda_stances only when the build
 // carries them. Plain text — no HTML escaping (this is an .md, not the DOM).
+// robust copy: Clipboard API first, then a hidden-textarea execCommand fallback
+// for insecure contexts / older browsers. Returns whether the copy succeeded.
+// (Same chain the shareBtn handler uses.)
+async function copyToClipboard(text) {
+  if (navigator.clipboard?.writeText) {
+    try { await navigator.clipboard.writeText(text); return true } catch { /* denied */ }
+  }
+  const ta = document.createElement('textarea')
+  ta.value = text
+  ta.style.position = 'fixed'; ta.style.opacity = '0'
+  document.body.appendChild(ta); ta.select()
+  let ok = false
+  try { ok = document.execCommand('copy') } catch { /* unsupported */ }
+  ta.remove()
+  return ok
+}
+
+// copies an AI briefing to the clipboard and always also downloads it (easiest
+// way to forward over WhatsApp); flashes the triggering button with feedback
+// origText overrides the "restore to" label — needed when the caller has
+// already replaced btnEl's text with a loading indicator before this resolves
+async function copyAndDownloadBriefing(md, slug, btnEl, origText) {
+  let copied = false
+  if (navigator.clipboard?.writeText) {
+    try { await navigator.clipboard.writeText(md); copied = true } catch { /* denied */ }
+  }
+  const blob = new Blob([md], { type: 'text/markdown' })
+  const a = document.createElement('a')
+  a.href = URL.createObjectURL(blob)
+  a.download = `${slug}-ai-briefing.md`
+  a.click()
+  URL.revokeObjectURL(a.href)
+  if (btnEl) {
+    const orig = origText ?? btnEl.textContent
+    btnEl.textContent = copied ? L('copied') : L('brief_saved')
+    setTimeout(() => { btnEl.textContent = orig }, 2000)
+  }
+}
+
 function briefingMd(seat, idx) {
   const bm = state.lang === 'bm'
   const L2 = (b, e) => (bm ? b : e)
@@ -548,6 +632,17 @@ Confirm setup now by replying with: a 3-line summary of this seat, the ledger (e
   if (issues.length) {
     lines.push('', '### Verified local issues (fact-checked, with receipts)')
     issues.forEach((it, i) => {
+      lines.push(`${i + 1}. ${it.issue_en ?? it.issue_bm}`)
+      if (it.receipt_en ?? it.receipt_bm) lines.push(`   Receipt: ${it.receipt_en ?? it.receipt_bm}`)
+      if (it.sources?.length) lines.push(`   Sources: ${it.sources.join(' ; ')}`)
+    })
+  }
+
+  // verified national issues (same curation discipline, uniform across seats)
+  const natIssues = idx.national_issues ?? []
+  if (natIssues.length) {
+    lines.push('', '### Verified national issues (fact-checked, with receipts)')
+    natIssues.forEach((it, i) => {
       lines.push(`${i + 1}. ${it.issue_en ?? it.issue_bm}`)
       if (it.receipt_en ?? it.receipt_bm) lines.push(`   Receipt: ${it.receipt_en ?? it.receipt_bm}`)
       if (it.sources?.length) lines.push(`   Sources: ${it.sources.join(' ; ')}`)
@@ -745,6 +840,79 @@ async function renderHome() {
   renderFooter(idx)
 }
 
+// ---- volunteer AI-briefing hub (muda edition only): find your seat, get an
+// AI briefing in one tap — no need to know a DUN code or dig through tabs ----
+async function renderVolunteer() {
+  const idx = await loadIndex()
+  if (idx.edition !== 'muda') { location.hash = '#/'; return }
+
+  app.innerHTML = `
+    <div class="crumbs"><a href="#/">← Johor</a></div>
+    <div class="card">
+      <h2>${L('volunteer_title')}</h2>
+      <p class="sub">${L('volunteer_sub')}</p>
+      <div id="volCta"></div>
+      <input class="searchbox" id="volSearch" placeholder="${L('search')}" autocomplete="off">
+      <div class="seat-list" id="volList"></div>
+    </div>`
+
+  const ctaEl = document.getElementById('volCta')
+  // after a successful copy, surface a single obvious next step: paste into a
+  // fresh ChatGPT/Gemini chat. The briefing is far too large to prefill via a
+  // URL param, so "copy → open app → paste" is the only reliable path.
+  const showCta = (seat) => {
+    ctaEl.innerHTML = `<div class="cta-copied">
+      <div class="cta-copied-head">${L('volunteer_copied', `${esc(seat.code)} ${esc(seat.name)}`)}</div>
+      <div class="sub">${L('volunteer_cta_sub')}</div>
+      <div class="btn-row">
+        <a class="btn" href="https://chatgpt.com/" target="_blank" rel="noopener">${L('volunteer_open_chatgpt')}</a>
+        <a class="btn" href="https://gemini.google.com/app" target="_blank" rel="noopener">${L('volunteer_open_gemini')}</a>
+      </div>
+    </div>`
+    ctaEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+  }
+
+  const listEl = document.getElementById('volList')
+  const renderList = (q = '') => {
+    const needle = q.trim().toLowerCase()
+    const rows = idx.seats.filter(s =>
+      !needle || `${s.code} ${s.name} ${s.parlimen} ${s.kpdn_district}`.toLowerCase().includes(needle))
+    listEl.innerHTML = rows.length ? rows.map(s => `
+      <div class="seat-row">
+        <span class="left">
+          <span class="name">${esc(s.code)} ${esc(s.name)} ${s.featured ? '★' : ''}</span>
+          <span class="meta">${esc(s.parlimen ?? '')}</span>
+        </span>
+        <button class="btn" data-slug="${esc(s.slug)}">${L('volunteer_get_btn')}</button>
+      </div>`).join('') : `<p class="sub">${L('volunteer_none')}</p>`
+    listEl.querySelectorAll('button[data-slug]').forEach(btn => btn.addEventListener('click', async () => {
+      const slug = btn.dataset.slug
+      const orig = btn.textContent
+      btn.textContent = L('volunteer_loading')
+      btn.disabled = true
+      try {
+        const seat = await loadSeat(slug)
+        const md = briefingMd(seat, idx)
+        const copied = await copyToClipboard(md)
+        if (copied) {
+          btn.textContent = L('copied')
+          showCta(seat)
+        } else {
+          // no download fallback here — hand the raw text over so they can copy it
+          window.prompt('Salin / Copy:', md)
+          btn.textContent = orig
+        }
+      } finally {
+        btn.disabled = false
+        if (btn.textContent === L('copied')) setTimeout(() => { btn.textContent = orig }, 2000)
+      }
+    }))
+  }
+  renderList()
+  document.getElementById('volSearch').addEventListener('input', (e) => renderList(e.target.value))
+  renderFooter(idx)
+}
+
 // ---- seat tabs ----
 function contestCard(seat) {
   const e = seat.election2026
@@ -815,6 +983,41 @@ function pricesCard(seat, compact = true) {
       <tbody>${rows}</tbody>
     </table>
     <div class="notice">${L('top3_note', p.items.length)} ${anyDistrict ? L('price_note') : L('no_price')}</div>
+  </div>`
+}
+
+// ---- government price-ceiling compliance (3 items: chicken/oil/rice) ----
+function ceilingCard(seat) {
+  const items = (seat.prices?.items ?? []).filter(i => i.ceiling)
+  if (!items.length) return ''
+  const bm = state.lang === 'bm'
+  const rows = items.map(it => {
+    const c = it.ceiling
+    const label = bm ? (c.label_bm ?? it.label_bm) : (c.label_en ?? it.label_en)
+    const exceeds = c.exceeds_perc != null && c.exceeds_perc > 0.5
+    const badge = c.observed == null
+      ? `<span class="delta-flat">${L('ceiling_no_data')}</span>`
+      : exceeds
+        ? `<span class="delta-up">${L('ceiling_exceeds', c.exceeds_perc.toFixed(1))}</span>`
+        : `<span class="delta-down">${L('ceiling_ok')}</span>`
+    return `<tr>
+      <td><strong>${esc(state.lang === 'bm' ? it.label_bm : it.label_en)}</strong><br><span style="color:var(--muted);font-size:.72rem">${esc(label)}</span></td>
+      <td class="num">${c.observed != null ? fmtRM(c.observed) : '–'}</td>
+      <td class="num">${fmtRM(c.price)}</td>
+      <td>${badge}</td>
+    </tr>`
+  }).join('')
+  const anySourced = items.some(it => it.ceiling.source)
+  const refs = items.filter(it => it.ceiling.source)
+    .map((it, i) => `<a href="${esc(it.ceiling.source)}" target="_blank" rel="noopener" style="color:var(--muted)">[${i + 1}]</a>`).join(' ')
+  return `<div class="card">
+    <h2>${L('ceiling_title')}</h2>
+    <p class="sub">${L('ceiling_sub')}</p>
+    <table class="data">
+      <thead><tr><th>${L('col_item')}</th><th class="num">${L('ceiling_observed')}</th><th class="num">${L('ceiling_official')}</th><th>${L('ceiling_status')}</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+    <div class="notice">${L('ceiling_note')}${anySourced ? ` ${refs}` : ''}</div>
   </div>`
 }
 
@@ -903,6 +1106,7 @@ function renderBrief(seat, bench, idx) {
   return `
     ${contestCard(seat)}
     ${pricesCard(seat)}
+    ${ceilingCard(seat)}
     ${raceCard(seat, idx)}
     ${incomeCard(seat, bench)}
     <div class="btn-row">
@@ -979,6 +1183,36 @@ function talkingPoints(seat, bench, idx) {
 // The prioritized 5-beat narrative: one story a candidate can carry, ordered
 // by what wins the seat — path, people, message, ground, ask. Every number is
 // pulled from the same verified data as the sections below it.
+// The punchy head of a curated issue string for a one-line doorstep message:
+// the clause before the first " — ", trimmed to a sentence / ~140 chars. Full
+// receipts and sources stay in issuesCard.
+function leadClause(text) {
+  if (!text) return ''
+  const head = text.split(' — ')[0].trim()
+  if (head.length <= 140) return head
+  const m = head.match(/^.*?[.!?](?=\s|$)/)
+  const sent = m ? m[0].trim() : head
+  return sent.length <= 140 ? sent : head.slice(0, 137).trimEnd() + '…'
+}
+
+// MUDA's official line for an issue theme (muda edition only — neutral builds
+// carry no seat.muda_stances, so this renders nothing there). Returns a small
+// appended HTML fragment: the stance lead + the top sourced leader quote with
+// attribution. NO_VERIFIED_POSITION themes get their honest stance line and
+// never a quotation; quotes[] entries are verified exact words by contract.
+function mudaAngleFor(theme, seat) {
+  if (!theme) return ''
+  const t = (seat.muda_stances ?? []).find(s => s.key === theme)
+  if (!t) return ''
+  const bm = state.lang === 'bm'
+  const stanceLead = leadClause(bm ? (t.stance_bm ?? t.stance_en) : (t.stance_en ?? t.stance_bm))
+  const q = (t.quotes ?? [])[0]
+  const quoteHtml = q
+    ? `<br>“${esc(q.text)}” — <strong>${esc(q.who)}</strong>, ${esc(bm ? (q.role_bm ?? q.role_en ?? '') : (q.role_en ?? q.role_bm ?? ''))} (${esc((q.date ?? '').slice(0, 4))})`
+    : ''
+  return `<br><span style="color:var(--muted);font-size:.82rem"><strong>MUDA:</strong> ${esc(stanceLead)}${quoteHtml}</span>`
+}
+
 function storyFor(seat, bench, idx) {
   const bm = state.lang === 'bm'
   const beats = []
@@ -1010,26 +1244,25 @@ function storyFor(seat, bench, idx) {
     beats.push({
       title: L('beat_voters'),
       text: bm
-        ? `<strong>${fmtNum(youthN)}</strong> pengundi bawah 30 (${youthP}% daftar 2026)${newV ? `, termasuk <strong>${fmtNum(newV)}</strong> pengundi baharu sejak PRU15` : ''}. Merekalah yang menentukan langkah 1.`
-        : `<strong>${fmtNum(youthN)}</strong> voters under 30 (${youthP}% of the 2026 roll)${newV ? `, including <strong>${fmtNum(newV)}</strong> new voters since GE15` : ''}. They decide beat 1.`,
+        ? `<strong>${fmtNum(youthN)}</strong> pengundi bawah 30 (${youthP}% daftar 2026)${newV ? `, termasuk <strong>${fmtNum(newV)}</strong> pengundi baharu sejak PRU15` : ''}.`
+        : `<strong>${fmtNum(youthN)}</strong> voters under 30 (${youthP}% of the 2026 roll)${newV ? `, including <strong>${fmtNum(newV)}</strong> new voters since GE15` : ''}.`,
     })
   }
 
-  // 3 — the doorstep message (one issue, not twelve)
-  const risers = seat.prices.items
-    .filter(i => i.change_12w_perc != null && i.change_12w_perc >= 3)
-    .sort((a, b) => b.change_12w_perc - a.change_12w_perc)
-  const r = raceStats(seat, idx)
-  if (risers.length) {
-    const top = risers[0]
-    const lbl = (bm ? top.label_bm : top.label_en).toLowerCase()
-    const cpi = r?.cpiYoy
-    beats.push({
-      title: L('beat_message'),
-      text: bm
-        ? `Satu isu, satu mesej: harga <strong>${esc(lbl)}</strong> naik <strong>${top.change_12w_perc}%</strong> dalam 12 minggu di ${esc(seat.prices.district ?? 'Johor')}${cpi != null ? ` — sedangkan inflasi rasmi kata ${cpi.toFixed(1)}% SETAHUN` : ''}. Tunjukkan harga di pasar mereka sendiri (senarai premis di bawah).`
-        : `One issue, one message: <strong>${esc(lbl)}</strong> up <strong>${top.change_12w_perc}%</strong> in 12 weeks in ${esc(seat.prices.district ?? 'Johor')}${cpi != null ? ` — while official inflation says ${cpi.toFixed(1)}% A YEAR` : ''}. Show them prices from their own market (premise list below).`,
-    })
+  // 3 — the doorstep message: one local issue + one national issue (full
+  // receipts + sources live in issuesCard below; muda edition overlays MUDA's
+  // stance + a sourced leader quote so it lands as the party's official line)
+  const localIssue = seat.local_issues?.seat?.[0] ?? seat.local_issues?.statewide?.[0] ?? null
+  const nationalIssue = idx.national_issues?.[0] ?? null
+  if (localIssue || nationalIssue) {
+    const section = (label, issue) => {
+      if (!issue) return ''
+      const lead = leadClause(bm ? (issue.issue_bm ?? issue.issue_en) : (issue.issue_en ?? issue.issue_bm))
+      const angle = mudaAngleFor(issue.theme, seat)
+      return `<strong>${label}:</strong> ${esc(lead)}${angle}`
+    }
+    const parts = [section(L('beat_local'), localIssue), section(L('beat_national'), nationalIssue)].filter(Boolean)
+    beats.push({ title: L('beat_message'), text: parts.join('<br>') })
   }
 
   // 4 — the ground map (where to spend shoe leather)
@@ -1087,8 +1320,9 @@ function storyCard(seat, bench, idx) {
   </div>`
 }
 
-// Curated, source-verified local issues (data/manual/issues.json via pipeline).
-function issuesCard(seat) {
+// Curated, source-verified issues: this seat's local ones, the Johor-statewide
+// set (data/manual/issues.json), and the national set (national_issues.json).
+function issuesCard(seat, idx) {
   const li = seat.local_issues
   if (!li) return ''
   const bm = state.lang === 'bm'
@@ -1101,13 +1335,15 @@ function issuesCard(seat) {
   }).join('')
   const seatItems = li.seat ?? []
   const stateItems = li.statewide ?? []
-  if (!seatItems.length && !stateItems.length) return ''
+  const nationalItems = idx?.national_issues ?? []
+  if (!seatItems.length && !stateItems.length && !nationalItems.length) return ''
   return `<div class="card">
     <h2>${L('issues_title')}</h2>
     <p class="sub">${L('issues_sub')}</p>
     <ul class="points">
       ${render(seatItems, null)}
       ${render(stateItems, L('issues_statewide'))}
+      ${render(nationalItems, L('issues_national'))}
     </ul>
   </div>`
 }
@@ -1204,7 +1440,7 @@ function renderField(seat, bench, idx) {
 
   return `
     ${storyCard(seat, bench, idx)}
-    ${issuesCard(seat)}
+    ${issuesCard(seat, idx)}
     ${mudaStancesCard(seat)}
     ${mudaSeatCard(seat, idx)}
     <div class="card">
@@ -1379,23 +1615,7 @@ async function renderSeat(slug, tab = 'brief') {
   })
 
   const briefBtn = document.getElementById('briefBtn')
-  if (briefBtn) briefBtn.addEventListener('click', async () => {
-    const md = briefingMd(seat, idx)
-    let copied = false
-    if (navigator.clipboard?.writeText) {
-      try { await navigator.clipboard.writeText(md); copied = true } catch { /* denied */ }
-    }
-    // always also download — easiest to forward to the field over WhatsApp
-    const blob = new Blob([md], { type: 'text/markdown' })
-    const a = document.createElement('a')
-    a.href = URL.createObjectURL(blob)
-    a.download = `${seat.slug}-ai-briefing.md`
-    a.click()
-    URL.revokeObjectURL(a.href)
-    const orig = briefBtn.textContent
-    briefBtn.textContent = copied ? L('copied') : L('brief_saved')
-    setTimeout(() => { briefBtn.textContent = orig }, 2000)
-  })
+  if (briefBtn) briefBtn.addEventListener('click', () => copyAndDownloadBriefing(briefingMd(seat, idx), seat.slug, briefBtn))
 
   renderFooter(idx)
   window.scrollTo(0, 0)
@@ -1407,6 +1627,7 @@ async function route() {
   try {
     const m = hash.match(/^#\/seat\/([a-z0-9-]+)(?:\/(brief|field|hq))?/)
     if (m) await renderSeat(m[1], m[2] ?? 'brief')
+    else if (hash === '#/volunteer') await renderVolunteer()
     else await renderHome()
   } catch (e) {
     console.error(e)
