@@ -90,6 +90,13 @@ export const BASKET = [
 
 // How many months of PriceCatcher to load (current month first).
 export const PRICE_MONTHS = 4
+// Long-horizon national cost-of-living store: monthly medians kept for this many
+// months in data/derived/price_history.json so the 1/3/6/12-month national price
+// trend can be computed. Closed past months are immutable — only the current +
+// previous month are ever refetched (the rest read from the committed artifact),
+// so the full 13-month pull happens once, not every run.
+export const PRICE_HISTORY_MONTHS = 13
+export const PRICE_HISTORY_PATH = 'data/derived/price_history.json'
 // Long-run price anchor: the month of the previous Johor election (SE-15),
 // so every item can show "change since the last time Johor voted".
 export const PRICE_ANCHOR_MONTH = '2022-03'

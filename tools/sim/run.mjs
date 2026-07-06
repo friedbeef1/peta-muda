@@ -43,9 +43,10 @@ for (const scenario of wanted) {
   await mkdir(work, { recursive: true })
   await buildFixtures(scenario, fixtures, path.join(ROOT, 'site', 'data'))
 
-  // sandbox: pipeline reads data/manual/* and writes site/data/* relative to
-  // cwd; link the app shell in too so the sim site is directly servable
-  await symlink(path.join(ROOT, 'data'), path.join(work, 'data'))
+  // sandbox: pipeline reads data/manual/* and now also writes the rolling
+  // data/derived/price_history.json artifact — so COPY data/ (not symlink) to
+  // keep each scenario's artifact isolated and out of the real repo tree
+  await cp(path.join(ROOT, 'data'), path.join(work, 'data'), { recursive: true })
   await mkdir(path.join(work, 'site'), { recursive: true })
   for (const f of ['index.html', 'app.js', 'styles.css']) {
     await symlink(path.join(ROOT, 'site', f), path.join(work, 'site', f))
