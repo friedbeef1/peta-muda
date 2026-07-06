@@ -69,7 +69,10 @@ export async function loadFuel() {
     const rows = await fetchDataGovMy(SOURCES.dataCatalogue('fuelprice', '&limit=120&sort=-date'))
     const levels = rows.filter(r => !r.series_type || r.series_type === 'level')
     levels.sort((a, b) => a.date.localeCompare(b.date))
-    return levels.slice(-12)
+    // keep ~14 months of weekly rows so the national cost-of-living card can
+    // compute 1/3/6/12-month fuel deltas (the app still reads .at(-1) for the
+    // latest-week chips); the source already returns 120 rows, so this is free
+    return levels.slice(-60)
   } catch (e) {
     console.warn(`fuelprice failed (${e.message}), skipping`)
     return null

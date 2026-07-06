@@ -127,6 +127,24 @@ export async function verifyScenario(scenario, simDataDir, committedDataDir) {
         ok(Math.abs(beras.ceiling.exceeds_perc) < 1, `${code}: beras exceeds_perc ${beras.ceiling.exceeds_perc} not ~0 after kg normalization`)
       }
     }
+    // national cost-of-living trend: 4 windows, signed numeric deltas, and the
+    // food composite must be built from NON-controlled items only (excludes
+    // the ceiling staples ayam/minyak/beras). Synthetic fixtures rise over the
+    // year, so CPI, fuel and food 12-month deltas must all read positive.
+    const ct = sim.index.cost_trend
+    ok(ct != null, 'cost_trend missing')
+    if (ct) {
+      ok(JSON.stringify(ct.windows) === JSON.stringify(['1m', '3m', '6m', '12m']), `cost_trend windows ${JSON.stringify(ct.windows)}`)
+      ok((ct.series?.length ?? 0) >= 3, `cost_trend too few series (${ct.series?.length})`)
+      for (const s of ct.series ?? []) {
+        ok(!!(s.key && s.label_bm && s.label_en && s.deltas), `cost_trend series ${s.key} missing fields`)
+        for (const w of ct.windows) ok(s.deltas[w] === null || typeof s.deltas[w] === 'number', `cost_trend ${s.key}.${w} not numeric/null`)
+      }
+      const byKey = Object.fromEntries((ct.series ?? []).map(s => [s.key, s]))
+      ok(byKey.cpi?.deltas?.['12m'] > 0, `cpi 12m delta should be positive (fixtures rise): ${byKey.cpi?.deltas?.['12m']}`)
+      ok(byKey.fuel_ron95?.deltas?.['12m'] > 0, `fuel_ron95 12m delta should be positive: ${byKey.fuel_ron95?.deltas?.['12m']}`)
+      ok(byKey.food_basket?.deltas?.['12m'] > 0, `food_basket 12m delta should be positive: ${byKey.food_basket?.deltas?.['12m']}`)
+    }
     // national issues: neutral metadata, both editions — every entry themed,
     // bilingual and sourced; in the muda build every theme must resolve to a
     // stance so the doorstep beat can always overlay a MUDA angle

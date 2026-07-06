@@ -326,7 +326,28 @@ export async function buildFixtures(scenario, outDir, dataDir = 'site/data') {
     await put(dunFilter(id), `${id}.json`, JSON.stringify(rows))
   }
   await put(dunFilter('cpi_state_inflation'), 'cpi.json', JSON.stringify(index.cpi ?? []))
-  await put(SOURCES.dataCatalogue('fuelprice', '&limit=120&sort=-date'), 'fuel.json', JSON.stringify(index.fuel ?? []))
+  // Fuel: the committed feed is ~12 weeks — too short for 6/12-month deltas.
+  // Synthesize a ~60-week weekly series ENDING at the committed latest values
+  // (so the home chips stay realistic) with a gentle rise going back, so the
+  // national cost-of-living card can compute all four fuel windows offline.
+  const fuelBase = (index.fuel ?? []).at(-1)
+  let fuelSeries = index.fuel ?? []
+  if (fuelBase?.date) {
+    const t = new Date(`${fuelBase.date}T00:00:00Z`).getTime()
+    fuelSeries = []
+    for (let i = 59; i >= 0; i--) {
+      const d = new Date(t - i * 7 * 86400e3).toISOString().slice(0, 10)
+      const f = 1 - 0.003 * i // older weeks a touch cheaper → ~18% rise over 12mo
+      fuelSeries.push({
+        ...fuelBase, date: d,
+        ron95: fuelBase.ron95 != null ? +(fuelBase.ron95 * f).toFixed(2) : null,
+        ron97: fuelBase.ron97 != null ? +(fuelBase.ron97 * f).toFixed(2) : null,
+        diesel: fuelBase.diesel != null ? +(fuelBase.diesel * f).toFixed(2) : null,
+        ron95_budi95: 1.99, // subsidised price is held flat
+      })
+    }
+  }
+  await put(SOURCES.dataCatalogue('fuelprice', '&limit=120&sort=-date'), 'fuel.json', JSON.stringify(fuelSeries))
   await put(SOURCES.pasarHealth, 'pasar_health.json', JSON.stringify({ health: {} }))
 
   // --- PriceCatcher: lookups + monthly parquets covering the app's window ---
@@ -411,10 +432,47 @@ export async function buildFixtures(scenario, outDir, dataDir = 'site/data') {
         obs(`${index.basket_since_se15.anchor_month}-15`, 90100, b.code, it.then)
       }
     }
-    // months the pipeline will request: current back PRICE_MONTHS + anchor.
-    // Emit every month we have obs for; missing requested months are fine
-    // (the pipeline tolerates unavailable months) but at least one of the two
-    // newest must exist — the max_date obs guarantees that.
+    // Long-horizon monthly history for the national cost-of-living trend: emit
+    // >=15 Johor obs per basket item for each of the trailing 13 months not
+    // already covered by the weekly obs above, so price_history's 13-month
+    // backfill has data and the 6/12-month food deltas materialize. Non-
+    // controlled items drift up going back (older cheaper → ~rising now, a
+    // testable direction); controlled staples stay flat.
+    {
+      const CONTROLLED = new Set(['ayam', 'minyak', 'beras'])
+      // "covered" = months with full weekly obs already (the current month only
+      // carries a single freshness marker, so it still needs synthetic obs)
+      const covered = new Set(weeks.map(w => w.slice(0, 7)))
+      const now = new Date(`${index.price_max_date}T00:00:00Z`)
+      const histMonths = []
+      for (let i = 12; i >= 0; i--) {
+        const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - i, 1))
+        histMonths.push({ ym: `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`, monthsAgo: i })
+      }
+      const baseFor = (b) => {
+        if (b.code === SYN_BERAS_TEMPATAN) return 26.00
+        if (b.code === SYN_BAWANG_PUTIH) return 9.50
+        const jo = seats[0].prices.items.find(i => i.code === b.code)?.series?.johor ?? {}
+        const wk = Object.keys(jo).sort()
+        return wk.length ? jo[wk[wk.length - 1]] : null
+      }
+      const allBasket = [...index.basket, { code: SYN_BERAS_TEMPATAN, key: 'beras_syn' }, { code: SYN_BAWANG_PUTIH, key: 'bawang_putih' }]
+      for (const { ym, monthsAgo } of histMonths) {
+        if (covered.has(ym)) continue // recent months already have weekly obs
+        for (const b of allBasket) {
+          const base = baseFor(b)
+          if (base == null) continue
+          const drift = CONTROLLED.has(b.key) ? 1 : (1 - 0.004 * monthsAgo) // older non-controlled a touch cheaper
+          const price = +(base * drift).toFixed(2)
+          // current month: date at the committed max_date so freshness is unchanged
+          const dateStr = monthsAgo === 0 ? index.price_max_date : `${ym}-15`
+          for (let k = 0; k < 15; k++) obs(dateStr, 90100, b.code, price)
+        }
+      }
+    }
+    // months the pipeline will request: current back PRICE_MONTHS + anchor +
+    // the 13-month history backfill. Emit every month we have obs for; missing
+    // requested months are fine (the pipeline tolerates unavailable months).
     for (const [ym, rows] of byMonth) {
       const buf = parquetWriteBuffer({
         columnData: [

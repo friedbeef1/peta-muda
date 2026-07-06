@@ -126,10 +126,16 @@ export async function loadPrices() {
 
   // ---- Phase B: weekly medians + latest premise snapshot ----
   const weekly = new Map() // `${item}|${scope}|${week}` -> number[]
+  const monthly = new Map() // `${item}|${scope}|${ym}` -> number[] (national cost-of-living history)
   const latestByPremiseItem = new Map() // `${prem}|${item}` -> {date, price}
   const push = (key, v) => {
     let a = weekly.get(key)
     if (!a) { a = []; weekly.set(key, a) }
+    a.push(v)
+  }
+  const pushM = (key, v) => {
+    let a = monthly.get(key)
+    if (!a) { a = []; monthly.set(key, a) }
     a.push(v)
   }
   for (const ym of available) {
@@ -144,15 +150,31 @@ export async function loadPrices() {
       const d = asIsoDate(r.date)
       if (d > maxDate) maxDate = d
       const week = mondayOf(d)
+      const month = d.slice(0, 7)
       push(`${item}|nat|${week}`, price)
+      pushM(`${item}|nat|${month}`, price)
       if (p.state === STATE) {
         push(`${item}|joh|${week}`, price)
         push(`${item}|d:${p.district}|${week}`, price)
+        pushM(`${item}|joh|${month}`, price)
         const k = `${prem}|${item}`
         const prev = latestByPremiseItem.get(k)
         if (!prev || d > prev.date) latestByPremiseItem.set(k, { date: d, price })
       }
     })
+  }
+
+  // monthly national+Johor medians for the fetched months, per basket code —
+  // fed to the rolling price_history artifact (fresh/authoritative for these
+  // recent months; older months come from the committed artifact untouched)
+  const monthlyMedians = {} // ym -> { code -> {nat, joh} }
+  for (const [key, arr] of monthly) {
+    const [itemStr, scope, ym] = key.split('|')
+    if (arr.length < 15) continue // thin months are unreliable; skip
+    const code = Number(itemStr)
+    if (!monthlyMedians[ym]) monthlyMedians[ym] = {}
+    if (!monthlyMedians[ym][code]) monthlyMedians[ym][code] = {}
+    monthlyMedians[ym][code][scope === 'nat' ? 'nat' : 'joh'] = +median(arr).toFixed(2)
   }
 
   // materialize weekly medians, keep last PRICE_WEEKS weeks
@@ -229,5 +251,5 @@ export async function loadPrices() {
     anchor.districts[district][item] = +median(arr).toFixed(2)
   }
 
-  return { basket, weeks, series, latest, anchor, max_date: maxDate, months_used: available }
+  return { basket, weeks, series, latest, anchor, max_date: maxDate, months_used: available, monthlyMedians, johorPremises }
 }

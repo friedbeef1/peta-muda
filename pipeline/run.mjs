@@ -13,6 +13,7 @@ import { loadDemographics } from './steps/demographics.mjs'
 import { loadKawasanku } from './steps/kawasanku.mjs'
 import { loadSocio, loadDunParlimen, loadCpi, loadFuel } from './steps/socio.mjs'
 import { loadPrices, mergeDistrict } from './steps/prices.mjs'
+import { updatePriceHistory, buildCostTrend } from './steps/cost_of_living.mjs'
 import { loadGeo } from './steps/geo.mjs'
 import { loadCrime } from './steps/crime.mjs'
 
@@ -306,6 +307,14 @@ const sinceMedian = sinceSe15Items.length >= 3
   ? [...sinceSe15Items.map(i => i.perc)].sort((a, b) => a - b)[sinceSe15Items.length >> 1]
   : null
 
+// ---- national cost-of-living trend (CPI + fuel + food over 1/3/6/12 months) ----
+// The food side reads/extends the rolling monthly-median artifact so the
+// 13-month history is pulled once, not every run (see steps/cost_of_living.mjs).
+log('updating price-history artifact + national cost-of-living trend')
+const priceHistory = await updatePriceHistory({ basket: prices.basket, johorPremises: prices.johorPremises, monthlyMedians: prices.monthlyMedians })
+log(`price_history: ${priceHistory.order.length} months stored${priceHistory.fetched.length ? `, fetched ${priceHistory.fetched.join(',')}` : ' (no extra fetch)'}`)
+const costTrend = buildCostTrend({ cpi, fuel, priceHistory, basket: prices.basket, controlledKeys: Object.keys(priceCeilings.items ?? {}) })
+
 // ---- Undi18 statewide rollup (neutral demographic fact) + MUDA Johor record ----
 // The 18-20 cohort is the tangible footprint of the 2019 voting-age reform;
 // summed across Johor it ships in BOTH editions (it is just demographics).
@@ -355,6 +364,7 @@ const index = {
   price_months: prices.months_used,
   fuel,
   cpi,
+  cost_trend: costTrend,
   edition: EDITION,
   national_issues: nationalIssues.issues ?? [],
   johor_context: { crime, undi18, muda: mudaJohor },

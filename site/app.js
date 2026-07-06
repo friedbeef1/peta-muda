@@ -27,6 +27,11 @@ const STR = {
     as_of: 'Harga setakat',
     cost_headline: 'Harga dapur di Johor — 12 minggu terkini',
     cost_sub: 'Perubahan harga median barangan asas di premis Johor (data PriceCatcher KPDN, dikemas kini harian)',
+    cost_trend_title: 'Kos sara hidup — arah nasional',
+    cost_trend_sub: 'Perubahan harga sebenar mengikut tempoh — naik (merah) atau turun (hijau) ikut data',
+    cost_trend_note: 'CPI: OpenDOSM (inflasi negeri Johor). Petrol: KPDN mingguan (seluruh negara). Bakul makanan: median PriceCatcher barangan bukan kawalan harga. Arah mengikut data — sahkan sebelum menerbitkan.',
+    win_1m: '1 bln', win_3m: '3 bln', win_6m: '6 bln', win_12m: '1 thn',
+    fuel_now: 'Harga petrol kini',
     fuel: 'Harga runcit petrol minggu ini (seluruh negara)',
     all_seats: 'Semua 56 kerusi DUN Johor',
     search: 'Cari kerusi, kawasan atau parlimen…',
@@ -166,6 +171,11 @@ const STR = {
     as_of: 'Prices as of',
     cost_headline: 'Kitchen prices in Johor — last 12 weeks',
     cost_sub: 'Median price change for staples at Johor premises (KPDN PriceCatcher, updated daily)',
+    cost_trend_title: 'Cost of living — national direction',
+    cost_trend_sub: 'Real price change by period — up (red) or down (green), the direction the data shows',
+    cost_trend_note: 'CPI: OpenDOSM (Johor state inflation). Fuel: KPDN weekly (nationwide). Food basket: median PriceCatcher price of non-price-controlled staples. Direction follows the data — verify before publishing.',
+    win_1m: '1mo', win_3m: '3mo', win_6m: '6mo', win_12m: '1yr',
+    fuel_now: 'Fuel price now',
     fuel: 'This week’s retail fuel prices (nationwide)',
     all_seats: 'All 56 Johor state seats',
     search: 'Search seat, area or parlimen…',
@@ -673,6 +683,17 @@ Confirm setup now by replying with: a 3-line summary of this seat, the ledger (e
     if (cpi) lines.push(`- Official Johor inflation: ${px(cpi.inflation_yoy)} YoY (${cpi.date?.slice(0, 7)})`)
   }
 
+  // national cost-of-living trend (direction per window — use the real sign)
+  const ct = idx.cost_trend
+  if (ct?.series?.length) {
+    lines.push('', '### National cost-of-living trend (% change; + = up, − = down; verify before publishing)')
+    const wl = ct.windows.join(' / ')
+    for (const s of ct.series) {
+      const vals = ct.windows.map(w => s.deltas[w] == null ? '–' : `${s.deltas[w] > 0 ? '+' : ''}${s.deltas[w]}%`).join(' / ')
+      lines.push(`- ${s.label_en} (${wl}): ${vals}`)
+    }
+  }
+
   lines.push('', '## DATA CAVEATS (assistant must respect these)')
   lines.push(`- Prices are KPDN premise medians by market district — a catchment approximation, not exact to the constituency.
 - Crime data is by POLICE district and statewide context only — never present it as this constituency's figure.
@@ -770,11 +791,42 @@ function crimeCard(idx) {
   </div>`
 }
 
+// National cost-of-living direction: one compact table, rows = series
+// (official inflation, fuel, food basket), columns = 1/3/6/12-month % change.
+// deltaHtml colours rising prices red / falling green (house convention).
+function costTrendCard(idx) {
+  const ct = idx.cost_trend
+  const bm = state.lang === 'bm'
+  const winLabel = { '1m': L('win_1m'), '3m': L('win_3m'), '6m': L('win_6m'), '12m': L('win_12m') }
+  const fuel = idx.fuel?.at(-1)
+  if (!ct?.series?.length) return ''
+  const rows = ct.series.map(s => {
+    const cells = ct.windows.map(w => `<td class="num">${deltaHtml(s.deltas[w])}</td>`).join('')
+    const label = bm ? s.label_bm : s.label_en
+    const yoy = s.yoy != null ? `<br><span style="color:var(--muted);font-size:.7rem">${bm ? 'tahunan' : 'YoY'} ${fmtPct(s.yoy, 1)}</span>` : ''
+    return `<tr><td><strong>${esc(label)}</strong>${yoy}</td>${cells}</tr>`
+  }).join('')
+  const fuelNow = fuel ? `<h3>${L('fuel_now')}</h3><div class="chips">
+    ${fuel.ron95_budi95 != null ? `<span class="chip">RON95 BUDI95 ${fmtRM(fuel.ron95_budi95)}</span>` : ''}
+    <span class="chip">RON95 ${bm ? 'tanpa subsidi' : 'unsub.'} ${fmtRM(fuel.ron95)}</span>
+    <span class="chip">RON97 ${fmtRM(fuel.ron97)}</span>
+    <span class="chip">Diesel ${fmtRM(fuel.diesel)}</span>
+  </div>` : ''
+  return `<div class="card">
+    <h2>${L('cost_trend_title')}</h2>
+    <p class="sub">${L('cost_trend_sub')}</p>
+    <table class="data">
+      <thead><tr><th>${L('col_item')}</th>${ct.windows.map(w => `<th class="num">${winLabel[w]}</th>`).join('')}</tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+    ${fuelNow}
+    <div class="notice" style="font-size:.72rem;margin-top:.5rem">${L('cost_trend_note')}</div>
+  </div>`
+}
+
 async function renderHome() {
   const idx = await loadIndex()
   const featured = idx.seats.filter(s => s.featured)
-  const chips = [...idx.basket_changes].sort((a, b) => b.change_perc - a.change_perc).slice(0, 3)
-  const fuel = idx.fuel?.at(-1)
 
   app.innerHTML = `
     <p class="sub" style="margin:2px 0 12px;color:var(--muted)">${L('tagline')}</p>
@@ -795,23 +847,7 @@ async function renderHome() {
       </div>
     </div>
 
-    <div class="card">
-      <h2>${L('cost_headline')}</h2>
-      <p class="sub">${L('cost_sub')}${asOfHtml(idx.price_max_date)}</p>
-      <div class="chips">
-        ${chips.map(c => `<span class="chip">${esc(state.lang === 'bm' ? c.label_bm : c.label_en)} ${deltaHtml(c.change_perc)}</span>`).join('')}
-      </div>
-      ${idx.basket_since_se15 ? `<h3>${L('since_se15')}</h3><div class="chips">
-        ${[...idx.basket_since_se15.items].sort((a, b) => b.perc - a.perc).slice(0, 3).map(i =>
-          `<span class="chip">${esc(state.lang === 'bm' ? i.label_bm : i.label_en)} ${deltaHtml(i.perc)}</span>`).join('')}
-      </div>` : ''}
-      ${fuel ? `<h3>${L('fuel')}</h3><div class="chips">
-        ${fuel.ron95_budi95 != null ? `<span class="chip">RON95 BUDI95 ${fmtRM(fuel.ron95_budi95)}</span>` : ''}
-        <span class="chip">RON95 ${state.lang === 'bm' ? 'tanpa subsidi' : 'unsubsidised'} ${fmtRM(fuel.ron95)}</span>
-        <span class="chip">RON97 ${fmtRM(fuel.ron97)}</span>
-        <span class="chip">Diesel ${fmtRM(fuel.diesel)}</span>
-      </div>` : ''}
-    </div>
+    ${costTrendCard(idx)}
 
     ${crimeCard(idx)}
 
