@@ -7,8 +7,10 @@ const storage = {
   get(k) { try { return localStorage.getItem(k) } catch { return null } },
   set(k, v) { try { localStorage.setItem(k, v) } catch { /* blocked */ } },
 }
+const LANGS = ['bm', 'en', 'zh']
+const LANG_LABEL = { bm: 'BM', en: 'EN', zh: '中' }
 const state = {
-  lang: storage.get('lang') === 'en' ? 'en' : 'bm',
+  lang: LANGS.includes(storage.get('lang')) ? storage.get('lang') : 'bm',
   index: null,
   seats: new Map(), // slug -> seat json
   geo: null,
@@ -304,16 +306,171 @@ const STR = {
     top3_note: (n) => `Top 3 rises out of ${n} monitored items.`,
     clinics: 'Clinics', schools: 'Schools', hospitals: 'Hospitals', grocery: 'Grocery stores', atm: 'ATMs', petrol: 'Petrol stations', police_fire: 'Police/Fire', water: 'Water access', electricity: 'Electricity access', expenditure: 'Mean expenditure',
   },
+  // Simplified Chinese. UI chrome only — curated content (issues/stances) falls
+  // back to English via pick(); verbatim quotes stay in their source language.
+  // Machine-translated; flag for a native Malaysian-Chinese review before use.
+  zh: {
+    tagline: '选区数据中心 — 2026 柔佛州选举',
+    days_to_poll: '天后投票',
+    poll_day: '投票日：2026年7月11日',
+    early_vote: '提前投票：2026年7月7日',
+    poll_today: '投票日 — 快去投票！',
+    poll_over: '2026 柔佛州选举已结束。感谢您的投票！',
+    featured: '进步阵线席位（MUDA–PSM）',
+    as_of: '物价截至',
+    cost_headline: '柔佛厨房物价 — 最近12周',
+    cost_sub: '柔佛零售点基本食品中位价格变动（KPDN PriceCatcher，每日更新）',
+    cost_trend_title: '生活成本 — 全国走势',
+    cost_trend_sub: '各时段的实际价格变动 — 上涨（红）或下跌（绿），依数据显示',
+    cost_trend_note: 'CPI：OpenDOSM（柔佛州通胀）。汽油：KPDN 每周（全国）。食物篮子：PriceCatcher 非管制食品中位价。走势依数据 — 发布前请核实。',
+    win_1m: '1个月', win_3m: '3个月', win_6m: '6个月', win_12m: '1年',
+    fuel_now: '当前汽油价',
+    fuel: '本周零售汽油价格（全国）',
+    all_seats: '柔佛全部56个州议席',
+    search: '搜索议席、地区或国会选区…',
+    voters: '选民',
+    youth: '30岁以下',
+    last_result: '2022年成绩',
+    majority: '多数票',
+    turnout: '投票率',
+    tab_brief: '简报',
+    tab_field: '战地',
+    tab_hq: '分析',
+    contest_2026: '2026年7月11日竞选',
+    contest_sub: '正式候选人名单（6月27日提名）— ElectionData.MY 数据',
+    results_2026: '2026年7月11日成绩',
+    results_sub: '正式成绩 — ElectionData.MY 数据',
+    first_time: '首次参选',
+    career_line: (c, w, el, yr) => `记录：${c} 次竞选，${w} 次胜出 · 最近 ${el}（${yr}）`,
+    record_title: '候选人记录',
+    record_sub: '本议席每位候选人的正式选举记录 — 来源 ElectionData.MY（使用前请核实）',
+    record_summary: (c, w) => `${c} 次竞选 · ${w} 次胜出`,
+    record_firsttimer: '新面孔 — 无过往选举记录',
+    record_hop: (n) => `转换政党 ${n} 次`,
+    record_switchedin: (p) => `今年首次以 ${p} 旗帜参选`,
+    record_now: '现今',
+    muda_title: 'MUDA — 小党，大能量',
+    muda_record_title: '全国记录（有出处）',
+    muda_seat_title: 'MUDA 在本议席的足迹',
+    stances_title: 'MUDA 对本地课题的回应',
+    brief_btn: '🤖 AI 简报（供 ChatGPT/Gemini）',
+    brief_saved: '.md 文件已下载！',
+    stances_sub: '有出处的立场 — 发布竞选材料前请核实',
+    volunteer_nav: '🤖 志工 AI 简报 →',
+    volunteer_title: '志工 AI 简报',
+    volunteer_sub: '找到你的议席，一键获取 AI 简报 — 可直接粘贴到 ChatGPT/Gemini。',
+    volunteer_get_btn: '🤖 获取我的 AI 简报',
+    volunteer_loading: '生成中…',
+    volunteer_none: '无匹配议席。',
+    volunteer_copied: (seat) => `✓ ${seat} 简报已复制到剪贴板`,
+    volunteer_cta_sub: '打开一个新对话，然后粘贴（Cmd/Ctrl+V）：',
+    volunteer_open_chatgpt: '打开 ChatGPT',
+    volunteer_open_gemini: '打开 Gemini',
+    ceiling_title: '政府顶价合规',
+    ceiling_sub: '3种管制品的实际价格 vs 官方顶价',
+    ceiling_observed: '本地价格',
+    ceiling_official: '官方顶价',
+    ceiling_status: '状态',
+    ceiling_ok: '顶价内',
+    ceiling_no_data: '无数据',
+    ceiling_exceeds: (p) => `+${p}% 超出`,
+    ceiling_note: '顶价由政府设定（非 KPDN PriceCatcher 数据）— 人工核实，发布前请核实。',
+    crime_title: '柔佛罪案',
+    crime_sub: '按警区划分的注册指数罪案',
+    crime_note: 'PDRM 数据为警区层级（非议席）。发布前请核实。',
+    race_title: '物价 vs 收入 vs 官方通胀',
+    race_sub: '年度变动率 — 厨房物价自上届选举（2022年3月）起计算',
+    basket_rate: '厨房篮子',
+    income_rate: '收入中位数',
+    cpi_official: '官方通胀（柔佛 CPI）',
+    since_se15: '自2022年3月选举以来',
+    stress_line: (r) => `家庭开支占每 RM100 收入中的 RM${r}`,
+    race_note: '物价率依 KPDN 篮子中位数计算；收入取自 HIES（DOSM 估算）；2022年后 KPDN 编码变更的品项已剔除。',
+    bloc_candidate: '进步阵线候选人',
+    prices_here: '你所在地区的厨房物价',
+    prices_sub: (d) => `${d} 县 KPDN 零售点中位价格 — vs 柔佛州中位数`,
+    col_item: '品项',
+    col_price: '价格',
+    col_johor: '柔佛',
+    col_4w: '4周',
+    col_12w: '3个月',
+    trend: '走势',
+    income_ctx: '收入背景',
+    income_median: '家庭收入中位数',
+    income_mean: '平均收入',
+    poverty: '绝对贫穷率',
+    gini: '不平等（基尼系数）',
+    u_rate: '失业率',
+    vs_johor_median: '柔佛州议席中位数',
+    share: '分享摘要',
+    copied: '已复制到剪贴板！',
+    story_title: '竞选故事 — 5步',
+    story_sub: '一条有序叙事；完整细节见下方',
+    beat_path: '致胜之路',
+    beat_voters: '关键选民',
+    beat_message: '门前讯息',
+    beat_ground: '战地地图',
+    beat_ask: '行动呼吁',
+    beat_local: '本地',
+    beat_national: '全国',
+    issues_national: '全国',
+    issues_title: '本地课题（来源核实）',
+    issues_sub: '本区专属课题，已对照新闻报道核实 — 参考编号可点击',
+    issues_statewide: '全柔佛',
+    talking_points: '逐户拜访要点',
+    tp_sub: '依官方数据自动生成 — 使用前请核实',
+    demo_title: '选民概况（2026 选民册）',
+    demo_sub: 'JHR-SE-16 选民册 — ElectionData.MY',
+    age_dist: '选民年龄',
+    ethnic_dist: '选民族群',
+    new_voters: '自第15届大选（2022年11月）以来的新选民',
+    women: '女性',
+    nearby: '附近受监测零售点（KPDN）',
+    nearby_sub: '本县受监测市场与商店的最新价格',
+    history: '成绩历史',
+    saluran: '投票区分析（2022年选举）',
+    saluran_sub: '按投票区划分的选票 — 找出堡垒区与争夺区',
+    dm: '投票区',
+    kaw_title: '地区指标（DOSM Kawasanku）',
+    kaw_sub: '本区设施与社会经济（人均）',
+    socio_series: '社会经济序列（HIES/LFS）',
+    export: '下载数据',
+    export_json: '完整议席 JSON',
+    export_csv: '投票区 CSV',
+    winner: '胜出者',
+    party: '政党',
+    election: '选举',
+    sources: '数据来源',
+    built: '数据构建于',
+    disclaimer: '非官方信息工具，100% 基于开放的政府/公共数据。非预测。发布竞选材料前请核实事实。',
+    err: '抱歉，无法加载数据。',
+    candidates: '候选人',
+    postal: '邮寄票',
+    early: '提前票',
+    income_note: (y) => `HIES ${y} 估算，DOSM`,
+    price_note: '价格为 KPDN 受监测零售点的中位数；各别商店会有差异。',
+    no_price: '无县级价格数据 — 显示柔佛州中位数。',
+    top3_note: (n) => `${n} 项受监测品项中涨幅最大的3项。`,
+    clinics: '诊所', schools: '学校', hospitals: '医院', grocery: '杂货店', atm: 'ATM', petrol: '油站', police_fire: '警察/消防', water: '供水', electricity: '供电', expenditure: '平均开支',
+  },
 }
 const L = (k, ...args) => {
   const dict = STR[state.lang] ?? STR.bm
-  const v = dict[k] ?? STR.bm[k] ?? k
+  // untranslated keys fall back to English (not Malay), so a Chinese reader
+  // never sees stray Malay for a key that only exists in en/bm
+  const v = dict[k] ?? STR.en[k] ?? STR.bm[k] ?? k
   return typeof v === 'function' ? v(...args) : v
 }
+// three-way inline microcopy: bm / en / zh (zh falls back to en if omitted)
+const T = (bm, en, zh) => state.lang === 'zh' ? (zh ?? en) : state.lang === 'en' ? en : bm
+// language-tagged data field: prefer the current language, else en, else bm.
+// Curated content has no _zh yet, so Chinese shows the English text (honest —
+// verbatim quotes and sourced prose are never machine-translated).
+const pick = (o, base) => o == null ? '' : (o[`${base}_${state.lang}`] ?? o[`${base}_en`] ?? o[`${base}_bm`] ?? '')
 
 // ---------- utils ----------
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
-const fmtNum = (v) => v == null ? '–' : Number(v).toLocaleString(state.lang === 'bm' ? 'ms-MY' : 'en-MY')
+const fmtNum = (v) => v == null ? '–' : Number(v).toLocaleString(state.lang === 'zh' ? 'zh-MY' : state.lang === 'en' ? 'en-MY' : 'ms-MY')
 const fmtRM = (v) => v == null ? '–' : `RM${Number(v).toFixed(2)}`
 const fmtPct = (v, dp = 1) => v == null ? '–' : `${Number(v).toFixed(dp)}%`
 const deltaHtml = (v) => {
@@ -473,10 +630,9 @@ function countdownCard(idx) {
 
 // ---- pro-MUDA edition (EDITION=muda) advocacy layer, gated on idx.edition ----
 function mudaRecordList(rec) {
-  const bm = state.lang === 'bm'
   return (rec?.national ?? []).map(it => {
-    const claim = bm ? (it.claim_bm ?? it.claim_en) : (it.claim_en ?? it.claim_bm)
-    const receipt = bm ? (it.receipt_bm ?? it.receipt_en) : (it.receipt_en ?? it.receipt_bm)
+    const claim = pick(it, 'claim')
+    const receipt = pick(it, 'receipt')
     const refs = (it.sources ?? []).map((u, i) =>
       ` <a href="${esc(u)}" target="_blank" rel="noopener" style="color:var(--muted)">[${i + 1}]</a>`).join('')
     const v = it.verdict ? `<span class="badge" style="background:var(--lain);font-size:.62rem">${esc(it.verdict)}</span> ` : ''
@@ -486,15 +642,14 @@ function mudaRecordList(rec) {
 
 function mudaHomeCard(idx) {
   if (idx.edition !== 'muda') return ''
-  const bm = state.lang === 'bm'
   const u = idx.johor_context?.undi18
   const m = idx.johor_context?.muda
   const rec = idx.muda_record
-  const headline = rec ? (bm ? rec.headline_bm : rec.headline_en) : L('muda_title')
-  const sub = rec ? (bm ? rec.sub_bm : rec.sub_en) : ''
+  const headline = rec ? pick(rec, 'headline') : L('muda_title')
+  const sub = rec ? pick(rec, 'sub') : ''
   const stats = []
-  if (u) stats.push(`<div style="min-width:130px"><div style="font-size:1.7rem;font-weight:800;color:var(--accent)">${fmtNum(u.total_18_20)}</div><div style="color:var(--muted);font-size:.72rem">${bm ? 'pengundi 18–20 tahun di daftar Johor 2026 — kohort yang dibuka oleh reformasi Undi18 2019' : "voters aged 18–20 on Johor's 2026 roll — the cohort the 2019 Undi18 reform opened up"}</div></div>`)
-  if (m) stats.push(`<div style="min-width:130px"><div style="font-size:1.7rem;font-weight:800;color:var(--accent)">${m.won}/${m.seats_contested}</div><div style="color:var(--muted);font-size:.72rem">${bm ? `kerusi Johor dimenangi MUDA pada 2022 (purata ${m.avg_perc}% undi)` : `Johor seats MUDA won in 2022 (avg ${m.avg_perc}% of the vote)`}</div></div>`)
+  if (u) stats.push(`<div style="min-width:130px"><div style="font-size:1.7rem;font-weight:800;color:var(--accent)">${fmtNum(u.total_18_20)}</div><div style="color:var(--muted);font-size:.72rem">${T('pengundi 18–20 tahun di daftar Johor 2026 — kohort yang dibuka oleh reformasi Undi18 2019', "voters aged 18–20 on Johor's 2026 roll — the cohort the 2019 Undi18 reform opened up", '2026年柔佛选民册上18–20岁的选民 — 2019年 Undi18 改革所开放的群体')}</div></div>`)
+  if (m) stats.push(`<div style="min-width:130px"><div style="font-size:1.7rem;font-weight:800;color:var(--accent)">${m.won}/${m.seats_contested}</div><div style="color:var(--muted);font-size:.72rem">${T(`kerusi Johor dimenangi MUDA pada 2022 (purata ${m.avg_perc}% undi)`, `Johor seats MUDA won in 2022 (avg ${m.avg_perc}% of the vote)`, `2022年 MUDA 胜出的柔佛议席（平均 ${m.avg_perc}% 选票）`)}</div></div>`)
   return `<div class="card" style="border:2px solid var(--accent)">
     <h2>${esc(headline)}</h2>
     ${sub ? `<p class="sub">${esc(sub)}</p>` : ''}
@@ -553,8 +708,8 @@ async function copyAndDownloadBriefing(md, slug, btnEl, origText) {
 }
 
 function briefingMd(seat, idx) {
-  const bm = state.lang === 'bm'
-  const L2 = (b, e) => (bm ? b : e)
+  // operator instructions: 3-way, Chinese falls back to English for now
+  const L2 = (b, e, z) => T(b, e, z)
   const demo = seat.demographics.find(d => d.election === 'JHR-SE-16') ?? seat.demographics[0]
   const lines = []
   const px = (v, d = 1) => v == null ? '–' : Number(v).toFixed(d) + '%'
@@ -706,14 +861,13 @@ Confirm setup now by replying with: a 3-line summary of this seat, the ledger (e
 function mudaStancesCard(seat) {
   const themes = seat.muda_stances
   if (!themes?.length) return ''
-  const bm = state.lang === 'bm'
   const items = themes.map(t => {
-    const label = bm ? (t.label_bm ?? t.label_en) : (t.label_en ?? t.label_bm)
-    const stance = bm ? (t.stance_bm ?? t.stance_en) : (t.stance_en ?? t.stance_bm)
+    const label = pick(t, 'label')
+    const stance = pick(t, 'stance')
     const refs = (t.sources ?? []).map((u, i) =>
       ` <a href="${esc(u)}" target="_blank" rel="noopener" style="color:var(--muted)">[${i + 1}]</a>`).join('')
     const quotes = (t.quotes ?? []).map(q => {
-      const role = bm ? (q.role_bm ?? q.role_en) : (q.role_en ?? q.role_bm)
+      const role = pick(q, 'role')
       return `<blockquote style="margin:.45rem 0 0;padding:.4rem .6rem;border-left:3px solid var(--accent);background:var(--bg2,rgba(0,0,0,.03));font-size:.8rem">
         “${esc(q.text)}”
         <br><span style="color:var(--muted);font-size:.72rem">— ${esc(q.who)}${role ? `, ${esc(role)}` : ''}${q.date ? ` (${esc(q.date.slice(0, 7))})` : ''}${q.source ? ` <a href="${esc(q.source)}" target="_blank" rel="noopener" style="color:var(--muted)">[sumber]</a>` : ''}</span>
@@ -734,7 +888,6 @@ function mudaStancesCard(seat) {
 
 function mudaSeatCard(seat, idx) {
   if (idx.edition !== 'muda') return ''
-  const bm = state.lang === 'bm'
   const demo = seat.demographics.find(d => d.election === 'JHR-SE-16') ?? seat.demographics[0]
   const n = demo?.age?.age_18_20 ?? null
   const perc = n != null && demo?.voters_total ? (100 * n / demo.voters_total).toFixed(1) : null
@@ -743,8 +896,8 @@ function mudaSeatCard(seat, idx) {
   return `<div class="card" style="border:2px solid var(--accent)">
     <h2>${L('muda_seat_title')}</h2>
     <ul class="points">
-      ${n != null ? `<li><strong>${fmtNum(n)}</strong> ${bm ? 'pengundi 18–20 tahun' : 'voters aged 18–20'}${perc ? ` (${perc}%)` : ''} ${bm ? 'di kerusi ini — dibuka oleh Undi18 (Syed Saddiq, 2019)' : 'in this seat — opened up by Undi18 (Syed Saddiq, 2019)'}</li>` : ''}
-      ${mc ? `<li>${bm ? 'MUDA bertanding di sini pada 2022' : 'MUDA contested here in 2022'}: <strong>${mc.perc}%</strong>${mc.won ? ` — <strong style="color:var(--accent)">${bm ? 'MENANG' : 'WON'}</strong>` : ''}</li>` : ''}
+      ${n != null ? `<li><strong>${fmtNum(n)}</strong> ${T('pengundi 18–20 tahun', 'voters aged 18–20', '18–20岁选民')}${perc ? ` (${perc}%)` : ''} ${T('di kerusi ini — dibuka oleh Undi18 (Syed Saddiq, 2019)', 'in this seat — opened up by Undi18 (Syed Saddiq, 2019)', '在本议席 — 由 Undi18 开放（赛沙迪，2019）')}</li>` : ''}
+      ${mc ? `<li>${T('MUDA bertanding di sini pada 2022', 'MUDA contested here in 2022', 'MUDA 于2022年在此参选')}: <strong>${mc.perc}%</strong>${mc.won ? ` — <strong style="color:var(--accent)">${T('MENANG', 'WON', '胜出')}</strong>` : ''}</li>` : ''}
     </ul>
   </div>`
 }
@@ -767,13 +920,12 @@ const CRIME_TYPE_LABELS = {
 }
 const crimeLabel = (t) => {
   const l = CRIME_TYPE_LABELS[t]
-  return l ? (state.lang === 'bm' ? l.bm : l.en) : String(t).replace(/_/g, ' ')
+  return l ? (l[state.lang] ?? l.en) : String(t).replace(/_/g, ' ')
 }
 
 function crimeCard(idx) {
   const c = idx.johor_context?.crime
   if (!c || !c.total_latest) return ''
-  const bm = state.lang === 'bm'
   const types = (c.by_type_latest ?? []).slice(0, 6)
   const maxT = Math.max(...types.map(t => t.value), 1)
   const dists = (c.by_district_latest ?? []).slice(0, 6)
@@ -782,10 +934,10 @@ function crimeCard(idx) {
     <h2>${L('crime_title')}</h2>
     <p class="sub">${L('crime_sub')} · ${esc(String(c.latest_year))}${c.source ? ` · ${esc(c.source)}` : ''}</p>
     <div style="margin:.3rem 0 .5rem"><span style="font-size:1.6rem;font-weight:800">${fmtNum(c.total_latest)}</span>
-      <span style="color:var(--muted)"> ${bm ? 'jenayah indeks dilaporkan' : 'index crimes reported'} ${esc(String(c.latest_year))}${c.change_yoy_perc != null ? ` · ${deltaHtml(c.change_yoy_perc)} ${bm ? 'vs tahun sebelum' : 'vs prior year'}` : ''}</span></div>
-    <h3>${bm ? 'Jenis teratas' : 'Top crime types'}</h3>
+      <span style="color:var(--muted)"> ${T('jenayah indeks dilaporkan', 'index crimes reported', '宗注册指数罪案')} ${esc(String(c.latest_year))}${c.change_yoy_perc != null ? ` · ${deltaHtml(c.change_yoy_perc)} ${T('vs tahun sebelum', 'vs prior year', 'vs 前一年')}` : ''}</span></div>
+    <h3>${T('Jenis teratas', 'Top crime types', '主要罪案类型')}</h3>
     ${types.map(t => barRow(crimeLabel(t.type), 100 * t.value / maxT, fmtNum(t.value))).join('')}
-    <h3>${bm ? 'Daerah polis teratas' : 'Top police districts'}</h3>
+    <h3>${T('Daerah polis teratas', 'Top police districts', '主要警区')}</h3>
     ${dists.map(d => barRow(esc(d.district), 100 * d.value / maxD, fmtNum(d.value))).join('')}
     <div class="notice" style="font-size:.72rem;margin-top:.5rem">${L('crime_note')}</div>
   </div>`
@@ -796,19 +948,18 @@ function crimeCard(idx) {
 // deltaHtml colours rising prices red / falling green (house convention).
 function costTrendCard(idx) {
   const ct = idx.cost_trend
-  const bm = state.lang === 'bm'
   const winLabel = { '1m': L('win_1m'), '3m': L('win_3m'), '6m': L('win_6m'), '12m': L('win_12m') }
   const fuel = idx.fuel?.at(-1)
   if (!ct?.series?.length) return ''
   const rows = ct.series.map(s => {
     const cells = ct.windows.map(w => `<td class="num">${deltaHtml(s.deltas[w])}</td>`).join('')
-    const label = bm ? s.label_bm : s.label_en
-    const yoy = s.yoy != null ? `<br><span style="color:var(--muted);font-size:.7rem">${bm ? 'tahunan' : 'YoY'} ${fmtPct(s.yoy, 1)}</span>` : ''
+    const label = pick(s, 'label')
+    const yoy = s.yoy != null ? `<br><span style="color:var(--muted);font-size:.7rem">${T('tahunan', 'YoY', '年比')} ${fmtPct(s.yoy, 1)}</span>` : ''
     return `<tr><td><strong>${esc(label)}</strong>${yoy}</td>${cells}</tr>`
   }).join('')
   const fuelNow = fuel ? `<h3>${L('fuel_now')}</h3><div class="chips">
     ${fuel.ron95_budi95 != null ? `<span class="chip">RON95 BUDI95 ${fmtRM(fuel.ron95_budi95)}</span>` : ''}
-    <span class="chip">RON95 ${bm ? 'tanpa subsidi' : 'unsub.'} ${fmtRM(fuel.ron95)}</span>
+    <span class="chip">RON95 ${T('tanpa subsidi', 'unsub.', '无补贴')} ${fmtRM(fuel.ron95)}</span>
     <span class="chip">RON97 ${fmtRM(fuel.ron97)}</span>
     <span class="chip">Diesel ${fmtRM(fuel.diesel)}</span>
   </div>` : ''
@@ -1240,11 +1391,13 @@ function mudaAngleFor(theme, seat) {
   if (!theme) return ''
   const t = (seat.muda_stances ?? []).find(s => s.key === theme)
   if (!t) return ''
-  const bm = state.lang === 'bm'
-  const stanceLead = leadClause(bm ? (t.stance_bm ?? t.stance_en) : (t.stance_en ?? t.stance_bm))
-  const q = (t.quotes ?? [])[0]
+  const stanceLead = leadClause(pick(t, 'stance'))
+  // prefer a quote captured in the current UI language (a real Chinese-source
+  // quote once one is added), else the first verbatim quote in any language
+  const qs = t.quotes ?? []
+  const q = qs.find(x => x.lang === state.lang) ?? qs[0]
   const quoteHtml = q
-    ? `<br>“${esc(q.text)}” — <strong>${esc(q.who)}</strong>, ${esc(bm ? (q.role_bm ?? q.role_en ?? '') : (q.role_en ?? q.role_bm ?? ''))} (${esc((q.date ?? '').slice(0, 4))})`
+    ? `<br>“${esc(q.text)}” — <strong>${esc(q.who)}</strong>, ${esc(pick(q, 'role'))} (${esc((q.date ?? '').slice(0, 4))})`
     : ''
   return `<br><span style="color:var(--muted);font-size:.82rem"><strong>MUDA:</strong> ${esc(stanceLead)}${quoteHtml}</span>`
 }
@@ -1445,7 +1598,7 @@ function renderField(seat, bench, idx) {
   let demoHtml = ''
   if (demo) {
     const ageBands = [['18–20', demo.age.age_18_20], ['21–29', demo.age.age_21_29], ['30–39', demo.age.age_30_39], ['40–49', demo.age.age_40_49], ['50–59', demo.age.age_50_59], ['60–69', demo.age.age_60_69], ['70+', demo.age.age_70_79 + demo.age.age_80_89 + demo.age['age_90+']]]
-    const eth = [['Melayu', demo.ethnic.ethnic_malay], ['Cina', demo.ethnic.ethnic_chinese], ['India', demo.ethnic.ethnic_indian], [state.lang === 'bm' ? 'Lain-lain' : 'Others', demo.ethnic.ethnic_bumi_sabah + demo.ethnic.ethnic_bumi_sarawak + demo.ethnic.ethnic_orang_asli + demo.ethnic.ethnic_other]]
+    const eth = [[T('Melayu', 'Malay', '马来'), demo.ethnic.ethnic_malay], [T('Cina', 'Chinese', '华裔'), demo.ethnic.ethnic_chinese], [T('India', 'Indian', '印裔'), demo.ethnic.ethnic_indian], [T('Lain-lain', 'Others', '其他'), demo.ethnic.ethnic_bumi_sabah + demo.ethnic.ethnic_bumi_sarawak + demo.ethnic.ethnic_orang_asli + demo.ethnic.ethnic_other]]
     const maxAge = Math.max(...ageBands.map(a => a[1]))
     const maxEth = Math.max(...eth.map(a => a[1]))
     demoHtml = `<div class="card">
@@ -1676,13 +1829,19 @@ async function route() {
   }
 }
 
-document.getElementById('langToggle').addEventListener('click', () => {
-  state.lang = state.lang === 'bm' ? 'en' : 'bm'
+// cycle BM → EN → 中文 → BM; the button shows the CURRENT language
+const langBtn = document.getElementById('langToggle')
+const syncLangBtn = () => {
+  langBtn.textContent = LANG_LABEL[state.lang]
+  langBtn.setAttribute('aria-label', `Language: ${state.lang.toUpperCase()} — tap to switch`)
+}
+langBtn.addEventListener('click', () => {
+  state.lang = LANGS[(LANGS.indexOf(state.lang) + 1) % LANGS.length]
   storage.set('lang', state.lang)
-  document.getElementById('langToggle').textContent = state.lang === 'bm' ? 'EN' : 'BM'
+  syncLangBtn()
   route()
 })
-document.getElementById('langToggle').textContent = state.lang === 'bm' ? 'EN' : 'BM'
+syncLangBtn()
 
 window.addEventListener('hashchange', route)
 route()
