@@ -141,9 +141,15 @@ export async function verifyScenario(scenario, simDataDir, committedDataDir) {
         for (const w of ct.windows) ok(s.deltas[w] === null || typeof s.deltas[w] === 'number', `cost_trend ${s.key}.${w} not numeric/null`)
       }
       const byKey = Object.fromEntries((ct.series ?? []).map(s => [s.key, s]))
+      // CPI + fuel come from clean synthetic series (cpi fixture cumulative;
+      // fuel a monotone-rising fixture) so their 12m must read positive.
       ok(byKey.cpi?.deltas?.['12m'] > 0, `cpi 12m delta should be positive (fixtures rise): ${byKey.cpi?.deltas?.['12m']}`)
       ok(byKey.fuel_ron95?.deltas?.['12m'] > 0, `fuel_ron95 12m delta should be positive: ${byKey.fuel_ron95?.deltas?.['12m']}`)
-      ok(byKey.food_basket?.deltas?.['12m'] > 0, `food_basket 12m delta should be positive: ${byKey.food_basket?.deltas?.['12m']}`)
+      // food composite mixes the real committed recent months with synthetic
+      // older ones, so its SIGN is data-dependent (varies with each data
+      // refresh) — assert the mechanism computed a number, not a direction.
+      ok(byKey.food_basket != null, 'food_basket series should be present')
+      ok(typeof byKey.food_basket?.deltas?.['12m'] === 'number', `food_basket 12m should compute: ${byKey.food_basket?.deltas?.['12m']}`)
     }
     // national issues: neutral metadata, both editions — every entry themed,
     // bilingual and sourced; in the muda build every theme must resolve to a

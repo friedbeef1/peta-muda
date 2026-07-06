@@ -83,6 +83,31 @@ there is no wrangler file in the repo).
   for 60 days the refresh cron silently pauses until someone pushes or re-enables
   it in the Actions tab.
 
+## Languages (BM / EN / 中文)
+
+The UI is trilingual via `STR = { bm, en, zh }` + a 3-way toggle (`site/app.js`).
+`L(key)` looks up the current language and falls back EN → BM. Two helpers:
+`T(bm, en, zh)` for inline microcopy (zh omitted ⇒ English), and `pick(obj,
+base)` for curated data fields (`base_zh ?? base_en ?? base_bm`).
+
+- **Chinese is Simplified**, and the `STR.zh` strings are **machine
+  translations** — get a native Malaysian-Chinese speaker to review them before
+  campaign publishing (same "verify before publishing" discipline as data).
+- **Curated content has no `_zh` yet** (issues, stances, candidate records,
+  muda_record) — Chinese readers see the **English** fallback for that prose.
+  To add Chinese content later, just add `_zh` fields to the JSON (e.g.
+  `issue_zh`, `stance_zh`, `headline_zh`); `pick()` lights them up with **no code
+  change**. This can be done per-field, incrementally.
+- **Quotes are never translated.** Each `muda_stances` quote's `text` is verbatim
+  in its source language, shown as-is in every UI. To add a genuine
+  **Chinese-language** quote (e.g. from Sin Chew / China Press), append it to the
+  theme's `quotes[]` with `"lang":"zh"` and the Chinese-source URL — the
+  renderers (`mudaAngleFor`) prefer a `lang`-matching quote when one exists.
+  (Attempted an automated hunt for verbatim Chinese quotes but this build
+  environment 403-blocks every Malaysian news + zh.wikipedia domain, so none
+  could be verified — none were inserted. Supply exact Chinese quote + source to
+  add one.)
+
 ## Key context (folded in from build-machine memory)
 
 **Election calendar:**
