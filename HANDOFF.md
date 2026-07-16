@@ -19,9 +19,9 @@ this repo.
 # 1. Install Node 22+ (macOS)
 brew install node        # or: https://nodejs.org
 
-# 2. Get the code
-git clone https://github.com/friedbeef1/<REPO>.git
-cd <REPO>
+# 2. Get the code (repo lives under the project org — no personal accounts)
+git clone https://github.com/<ORG>/peta-muda.git
+cd peta-muda
 
 # 3. Install deps + build the data + run
 npm install
@@ -48,9 +48,17 @@ Worker** named `peta-muda` (Workers Builds; production branch `main`, build
 command none, deploy command `npx wrangler deploy`, config dashboard-side —
 there is no wrangler file in the repo).
 
-- **Live URL: <https://peta-muda.jamesyeang.workers.dev>** — deployed on every
-  push to `main` (including the data bot's own commits, so data refreshes go
-  live automatically).
+- **Live URL: `https://peta-muda.<SUBDOMAIN>.workers.dev`** (the account's
+  workers.dev subdomain is intentionally a neutral project name — never a
+  personal identifier). Deployed on every push to `main` (including the data
+  bot's own commits, so data refreshes go live automatically).
+- **Anonymity rule for this repo**: it is PUBLIC under a neutral org. Never
+  commit under a personal name/email, never open PRs from personal accounts
+  (PR pages publicly show the opening account, and GitHub squash merges stamp
+  the merger's name/email into history). Convention: work on a branch, run
+  both sim suites, then push directly to `main` with a neutral author
+  (`Claude <noreply@anthropic.com>` / `peta-muda-bot`). The pre-migration
+  history lives in a separate PRIVATE archive repo.
 - **The deployed build is the MUDA edition** (`EDITION: muda` in
   `refresh.yml`'s pipeline step): the team-facing version with the volunteer
   AI-briefing hub, MUDA record/stance cards, and briefing export. Remove that
